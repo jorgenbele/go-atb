@@ -1,0 +1,44 @@
+* go-atb
+~go-atb~ is a cli for AtB's travel planner. (see: atb.no)
+It is separated into a go package (~atb/~) which can be reused for
+other purposes and a cli program (~main.go~).
+
+** How to install
+#+BEGIN_SRC sh
+go get github.com/jorgenbele/go-atb
+#+END_SRC
+
+** Usage
+#+BEGIN_SRC sh
+AtB Travel Planner
+
+Usage: atb <from> <to> [options]
+
+Options:
+    --no-suggestions    Always send 'from' and 'to' as provided.
+#+END_SRC
+
+** Gif
+[[./go-atb-demo-1.gif]]
+
+** Examples
+*** Without suggestions
+#+BEGIN_SRC sh
+$ ./go-atb --no-suggestions Olav Tryggvasons gt. (Trondheim) Studentersamfundet (Trondheim)
+From Olav Tryggvasons gt. (Trondheim) to Studentersamfundet (Trondheim)
+Start| End |Durat|Chan|F|Route     
+11:42|16:16|274 m|   1|-|Walk ⟶  905 ⟶  905
+11:37|15:16|219 m|   1|-|Walk ⟶  905 ⟶  905
+16:27|21:16|289 m|   1|-|Walk ⟶  905 ⟶  905
+#+END_SRC
+
+*** With suggestions
+#+BEGIN_SRC sh
+$ ./go-atb olav stud
+# The user must choose from a list of bus stops (suggestions)
+From Olav Tryggvasons gt. (Trondheim) to Studentersamfundet (Trondheim)
+Start| End |Durat|Chan|F|Route     
+11:42|16:16|274 m|   1|-|Walk ⟶  905 ⟶  905
+11:37|15:16|219 m|   1|-|Walk ⟶  905 ⟶  905
+16:27|21:16|289 m|   1|-|Walk ⟶  905 ⟶  905
+#+END_SRC
