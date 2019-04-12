@@ -10,17 +10,20 @@ import (
 	"fmt"
 	"github.com/anaskhan96/soup"
 	"github.com/levigross/grequests"
+    "github.com/b4b4r07/go-finder/source"
+    "github.com/b4b4r07/go-finder"
 	"strconv"
 	"strings"
 	"time"
+    "os"
 )
 
 // URL for the 'suggestions' endpoint.
 const SuggestionsURL = "https://rp.atb.no/scripts/TravelMagic/TravelMagicWE.dll/StageJSON"
 
 type SuggestionRes struct {
-	query       string   `json:"query"`
-	suggestions []string `json:"suggestions"`
+	Query       string   `json:"query"`
+	Suggestions []string `json:"suggestions"`
 }
 
 func GetSuggestions(query string) ([]string, error) {
@@ -33,9 +36,9 @@ func GetSuggestions(query string) ([]string, error) {
 		return nil, err
 	}
 
-	sr := &SuggestionRes{}
-	err = resp.JSON(sr)
-	return sr.suggestions, err
+    var sr SuggestionRes
+	err = resp.JSON(&sr)
+	return sr.Suggestions, err
 }
 
 // URL for the 'departures' endpoint.
@@ -60,7 +63,7 @@ type Departure struct {
 	End      time.Time
 	Changes  int
 	Fare     string
-	Duration time.Duration // change type
+	Duration time.Duration
 	Route    []Transport
 }
 
@@ -105,30 +108,19 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 	if err != nil {
 		return
 	}
-	//fmt.Println(html)
 
 	doc := soup.HTMLParse(html)
-
 	mainContent := doc.FindStrict("div", "class", "maincontent")
-	//fmt.Println("mainContent", mainContent)
 
 	// Used when parsing start and end times.
 	date := doc.FindStrict("h2", "class", "tm-alpha tm-reiseforslag-header").Text()
-
-	//fmt.Println("date", date)
-
-	//resultWrappers := mainContent.Find("div", "class", "tm-result-wrapper")
 	resultWrappers := mainContent.FindAllStrict("div", "class", "tm-result-wrapper")
-	//fmt.Println("resultWrappers", resultWrappers)
 
 	for _, rw := range resultWrappers {
 		var d Departure
-
 		// The tm-block-b span contains:
 		//     start and end time, duration, changes and fare
 		blockB := rw.FindStrict("span", "class", "tm-block-b")
-
-		//fmt.Println("Block b", blockB)
 
 		// tm-block-b contains two tm-result-time-wrapper elements
 		// where the first one is the start time, and the second
@@ -148,15 +140,11 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 		}
 		d.Start, d.End = unpackTime(blockB.FindAll("span", "class", "tm-result-fratil"))
 
-		//fmt.Println("Start, end", d.Start, d.End)
-
 		// tm-result-details-extra contains three tm-result-info elements:
 		// 1. duration, 2. changes, 3. fare
 		// The 'tm-result-info-val' element contains the string describing each
 		// element previously described.
 		extraDetails := blockB.FindStrict("span", "class", "tm-inline-block tm-result-details-extra")
-		//fmt.Println("extradetails", extraDetails)
-
 		spanClasses := []string{"tm-result-value-time", "tm-result-value-change", "tm-result-value-price"}
 		values := [3]soup.Root{}
 		for i, className := range spanClasses {
@@ -223,10 +211,6 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 
 			d.Route = append(d.Route, t)
 		}
-
-		//fmt.Println("Route", d.Route)
-
-		//fmt.Printf("duration: %d minutes, changes: %d, fare: %s\n", d.Duration, d.Changes, d.Fare)
 		deps = append(deps, d)
 	}
 
@@ -239,18 +223,10 @@ func GetDeparturesNow(dir int, from, to string) ([]Departure, error) {
 	dtime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
 	ddate := fmt.Sprintf("%02d.%02d.%02d", now.Day(), now.Month(), now.Year())
 
-	//fmt.Println("dtime", dtime)
-	//fmt.Println("ddate", ddate)
-
 	return GetDepartures(dir, from, to, dtime, ddate)
 }
 
-func main() {
-	s, _ := GetSuggestions("Konglevegen")
-	fmt.Println(s)
-	deps, _ := GetDeparturesNow(1, "Konglevegen (Trondheim)", "Munkegata (Trondheim)")
-	fmt.Println(deps)
-
+func printPlanMinimal(deps []Departure) {
     fmt.Printf("%-5s| %-3s |%3s|%4s|%1s|%-10s\n", "Start", "End", "Durat", "Chan", "F", "Route")
     for _, d := range deps {
         route := make([]string, len(d.Route))
@@ -262,8 +238,70 @@ func main() {
             }
         }
         routeStr := route[0] + strings.Join(route[1:], " ⟶  ")
-        fmt.Printf("%02d:%02d|%02d:%02d|%3s|%4d|%1s|%s\n", d.Start.Hour(), d.Start.Minute(), d.End.Hour(), d.End.Minute(), d.Duration.String(), d.Changes, d.Fare, routeStr)
+        fmt.Printf("%02d:%02d|%02d:%02d|%3.0f m|%4d|%1s|%s\n", d.Start.Hour(), d.Start.Minute(), d.End.Hour(), d.End.Minute(), d.Duration.Minutes(), d.Changes, d.Fare, routeStr)
     }
+}
+
+func main() {
+    fromArg := os.Args[1]
+    toArg := os.Args[2]
+
+    // Get suggestions in parallell.
+    fromChan := make(chan []string)
+    toChan := make(chan []string)
+
+    go func() {
+        v, _ := GetSuggestions(fromArg)
+        //fmt.Println("Got from:", v)
+        fromChan <- v
+    }()
+
+    go func() {
+        v, _ := GetSuggestions(toArg)
+        //fmt.Println("Got to:", v)
+        toChan <- v
+    }()
+
+    sFrom := <-fromChan
+    sTo := <-toChan
+
+    // TODO: Add cli flag.
+    finder, err := finder.New()
+    if err != nil {
+        panic(err)
+    }
+
+	//fmt.Println(sFrom, sTo)
+    var to, from string
+    if len(sFrom) < 2 {
+        from = sFrom[0]
+    } else {
+        finder.Read(source.Slice(sFrom))
+        toSlice, err := finder.Run()
+        if err != nil {
+            panic(err)
+        }
+        from = toSlice[0]
+    }
+
+
+    if len(sTo) < 2 {
+        to = sTo[0]
+    } else {
+        finder.Read(source.Slice(sTo))
+        fromSlice, err := finder.Run()
+        if err != nil {
+            panic(err)
+        }
+        from = fromSlice[0]
+    }
+
+	deps, _ := GetDeparturesNow(1, from, to)
+	//fmt.Println(deps)
+
+	fmt.Printf("From %s to %s\n", from, to)
+    printPlanMinimal(deps)
+
 
 	//now := time.Now()
 	//dtime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
