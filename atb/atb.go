@@ -107,45 +107,70 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 	}
 
 	doc := soup.HTMLParse(html)
+    if err = doc.Error; err != nil {
+        return
+    }
 	mainContent := doc.FindStrict("div", "class", "maincontent")
+    if err = mainContent.Error; err != nil {
+        return
+    }
 
 	// Used when parsing start and end times.
-	date := doc.FindStrict("h2", "class", "tm-alpha tm-reiseforslag-header").Text()
+	date := doc.FindStrict("h2", "class", "tm-alpha tm-reiseforslag-header")
+    if err = date.Error; err != nil {
+        return
+    }
+
+    dateStr := date.Text()
 	resultWrappers := mainContent.FindAllStrict("div", "class", "tm-result-wrapper")
 
 	for _, rw := range resultWrappers {
 		var d Departure
+
+        if err = rw.Error; err != nil {
+            return
+        }
+
 		// The tm-block-b span contains:
 		//     start and end time, duration, changes and fare
-		blockB := rw.FindStrict("span", "class", "tm-block-b")
+		blockB := rw.FindStrict("span", "class", "tm-block-b");
+        if err = blockB.Error; err != nil {
+            return
+        }
 
 		// tm-block-b contains two tm-result-time-wrapper elements
 		// where the first one is the start time, and the second
 		// one is the end time.
-		unpackTime := func(res []soup.Root) (start, end time.Time) {
+		unpackTime := func(res []soup.Root) (start, end time.Time, err error) {
 			// Use the date of departure together with the start/end time
 			// to convert to a time.Time object.
-			start, err := dateTimeMerge(date, res[0].Text())
+			start, err = dateTimeMerge(dateStr, res[0].Text())
 			if err != nil {
-				fmt.Println(err)
+				return
 			}
-			end, err = dateTimeMerge(date, res[1].Text())
-			if err != nil {
-				fmt.Println(err)
-			}
+			end, err = dateTimeMerge(dateStr, res[1].Text())
 			return
 		}
-		d.Start, d.End = unpackTime(blockB.FindAll("span", "class", "tm-result-fratil"))
+		d.Start, d.End, err = unpackTime(blockB.FindAll("span", "class", "tm-result-fratil"))
+        if err != nil {
+            return
+        }
 
 		// tm-result-details-extra contains three tm-result-info elements:
 		// 1. duration, 2. changes, 3. fare
 		// The 'tm-result-info-val' element contains the string describing each
 		// element previously described.
 		extraDetails := blockB.FindStrict("span", "class", "tm-inline-block tm-result-details-extra")
+        if err = extraDetails.Error; err != nil {
+            return
+        }
 		spanClasses := []string{"tm-result-value-time", "tm-result-value-change", "tm-result-value-price"}
 		values := [3]soup.Root{}
 		for i, className := range spanClasses {
 			values[i] = extraDetails.Find("span", "class", className).Find("span", "class", "tm-result-info-val")
+            if err = values[i].Error; err != nil {
+                return
+            }
 		}
 
 		parseDuration := func(duration string) (d time.Duration, err error) {
@@ -154,28 +179,34 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 			if err != nil {
 				return
 			}
-			minutes, err := strconv.Atoi(durationSplice[1])
-			if err != nil {
-				return
-			}
+			minutes, err := strconv.Atoi(durationSplice[1]) // err is returned
 			d = time.Duration(hours)*time.Hour + time.Duration(minutes)*time.Minute
 			return
 		}
 
-		unpackExtraDetails := func(res [3]soup.Root) (duration time.Duration, changes int, fare string) {
-			duration, _ = parseDuration(res[0].Text()) // ignore error
-			changes, _ = strconv.Atoi(res[1].Text())   // ignore error
+		unpackExtraDetails := func(res [3]soup.Root) (duration time.Duration, changes int, fare string, err error) {
+			duration, err = parseDuration(res[0].Text())
+			if err != nil {
+                return
+			}
+			changes, err = strconv.Atoi(res[1].Text()) // err is returned
 			fare = res[2].Text()
 			return
 		}
 
-		d.Duration, d.Changes, d.Fare = unpackExtraDetails(values)
+		d.Duration, d.Changes, d.Fare, err = unpackExtraDetails(values)
+        if err != nil {
+            return
+        }
 
 		// The various travel destinations that the trip from A to B
 		// has to go through. This is a list consisting of transportation
 		// methods that is used. For example: {"38"} if the entire trip
 		// consists of taking route 38.
 		routeSpan := mainContent.FindStrict("span", "class", "tm-det-wrapper tm-alpha8")
+        if err = routeSpan.Error; err != nil {
+            return
+        }
 
 		// Treat the children as an ordered list of edges from travel method
 		// to travel method.
@@ -184,11 +215,21 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 		for _, td := range travelDests {
 			var t Transport
 
+            if err = td.Error; err != nil {
+                return
+            }
+
 			// Each td has a span 'tm-det-text-walk' and a span 'tm-det-transport' (containing
 			// 'tm-det-linenr'). To determine if the transport method is walking or by bus
 			// check if 'tm-det-text-walk' is non-empty, as it should contain "Walking"
 			// if the given transport is walking, and empty if by bus (or other transport).
-			walkText := td.FindStrict("span", "class", "tm-det-text tm-det-text-walk").Text()
+			walkSpan := td.FindStrict("span", "class", "tm-det-text tm-det-text-walk")
+            if err = walkSpan.Error; err != nil {
+                return
+            }
+
+			walkText := walkSpan.Text()
+
 			if walkText != "" {
 				t.WalkText = walkText
 				t.Type = TransportWalking
@@ -198,13 +239,16 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 				lineNumStr := td.FindStrict("span", "class", "tm-det-linenr").Text()
 				t.LineNum, err = strconv.Atoi(lineNumStr)
 				if err != nil {
-					panic("Illegal line number")
+                    return
 				}
 			}
 
 			// Each td also contains a span with the time 'tm-det-time'.
 			detTimeSpan := td.FindStrict("span", "class", "ui-helper-hidden-accessible tm-det-time")
-			t.Start, _ = dateTimeMerge(date, detTimeSpan.Text())
+            if err = detTimeSpan.Error; err != nil {
+                return
+            }
+			t.Start, _ = dateTimeMerge(dateStr, detTimeSpan.Text())
 
 			d.Route = append(d.Route, t)
 		}
@@ -222,95 +266,3 @@ func GetDeparturesNow(dir int, from, to string) ([]Departure, error) {
 
 	return GetDepartures(dir, from, to, dtime, ddate)
 }
-
-//
-//func bold(s string) string {
-//	return fmt.Sprintf("\033[1m%s\033[0m", s)
-//}
-//
-//func printPlanMinimal(deps []Departure) {
-//	fmt.Printf("%-5s| %-3s |%3s|%4s|%1s|%-10s\n", "Start", "End", "Durat", "Chan", "F", "Route")
-//	for _, d := range deps {
-//		route := make([]string, len(d.Route))
-//		for i, r := range d.Route {
-//			if r.Type == TransportBus {
-//				route[i] = strconv.Itoa(r.LineNum)
-//			} else {
-//				route[i] = r.WalkText
-//			}
-//		}
-//		routeStr := strings.Join(route, " ⟶  ")
-//		fmt.Printf("%02d:%02d|%02d:%02d|%3.0f m|%4d|%1s|%s\n", d.Start.Hour(), d.Start.Minute(), d.End.Hour(), d.End.Minute(),
-//			d.Duration.Minutes(), d.Changes, d.Fare, routeStr)
-//	}
-//}
-//
-//func main() {
-//
-//
-//	if len(os.Args[1:]) != 2 {
-//		fmt.Fprintf(os.Stderr, "Usage: %s <from> <to>", os.Args[0])
-//		os.Exit(1)
-//	}
-//
-//	fromArg := os.Args[1]
-//	toArg := os.Args[2]
-//
-//	// Get suggestions in parallell.
-//	fromChan := make(chan []string)
-//	toChan := make(chan []string)
-//
-//	go func() {
-//		v, err := GetSuggestions(fromArg)
-//		if err != nil {
-//			panic(fmt.Sprintf("Unable to get suggestion: %v", err))
-//		}
-//		fromChan <- v
-//	}()
-//
-//	go func() {
-//		v, err := GetSuggestions(toArg)
-//		if err != nil {
-//			panic(fmt.Sprintf("Unable to get suggestion: %v", err))
-//		}
-//		toChan <- v
-//	}()
-//
-//	sFrom := <-fromChan
-//	sTo := <-toChan
-//
-//	// TODO: Add cli flag.
-//	finder, err := finder.New()
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	//fmt.Println(sFrom, sTo)
-//	var to, from string
-//	if len(sFrom) < 2 {
-//		from = sFrom[0]
-//	} else {
-//		finder.Read(source.Slice(sFrom))
-//		toSlice, err := finder.Run()
-//		if err != nil {
-//			panic(err)
-//		}
-//		from = toSlice[0]
-//	}
-//
-//	if len(sTo) < 2 {
-//		to = sTo[0]
-//	} else {
-//		finder.Read(source.Slice(sTo))
-//		fromSlice, err := finder.Run()
-//		if err != nil {
-//			panic(err)
-//		}
-//		from = fromSlice[0]
-//	}
-//
-//	deps, _ := GetDeparturesNow(1, from, to)
-//
-//	fmt.Printf(bold(":: From %s to %s\n"), from, to)
-//	printPlanMinimal(deps)
-//}

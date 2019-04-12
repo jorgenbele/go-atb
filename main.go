@@ -12,7 +12,8 @@ import (
 	"github.com/b4b4r07/go-finder"
 	"github.com/b4b4r07/go-finder/source"
 	"github.com/docopt/docopt-go"
-	"github.com/jorgenbele/go-atb/atb"
+	//"github.com/jorgenbele/go-atb/atb"
+	"go-atb/atb"
 	"strconv"
 	"strings"
 )
