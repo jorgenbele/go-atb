@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"github.com/b4b4r07/go-finder"
 	"github.com/b4b4r07/go-finder/source"
+    "github.com/docopt/docopt-go"
 	"github.com/jorgenbele/go-atb/atb"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -37,15 +37,24 @@ func printPlanMinimal(deps []atb.Departure) {
 }
 
 func main() {
+    usage := `AtB Travel Planner
 
+Usage: atb <from> <to>`
 
-	if len(os.Args[1:]) != 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <from> <to>\n", os.Args[0])
-		os.Exit(1)
-	}
+    args, err := docopt.ParseDoc(usage)
+    if err != nil {
+        panic(fmt.Sprintf("Unable to parse arguments: %v\n", err))
+    }
 
-	fromArg := os.Args[1]
-	toArg := os.Args[2]
+	fromArg, err := args.String("<from>")
+    if err != nil {
+        panic(err)
+    }
+
+	toArg, err := args.String("<to>")
+    if err != nil {
+        panic(err)
+    }
 
 	// Get suggestions in parallell.
 	fromChan := make(chan []string)
@@ -93,11 +102,11 @@ func main() {
 		to = sTo[0]
 	} else {
 		finder.Read(source.Slice(sTo))
-		fromSlice, err := finder.Run()
+		toSlice, err := finder.Run()
 		if err != nil {
 			panic(err)
 		}
-		from = fromSlice[0]
+		to = toSlice[0]
 	}
 
 	deps, _ := atb.GetDeparturesNow(1, from, to)
