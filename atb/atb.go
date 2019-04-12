@@ -2,7 +2,8 @@
 // Date: 12.04.2019
 // Author: Jørgen Bele Reinfjell
 // Description: AtB route plannner cli to get next departure
-//
+
+// TODO: Support other transport types; boats, ...
 
 package atb
 
@@ -238,6 +239,16 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 				return
 			}
 			changes, err = strconv.Atoi(res[1].Text()) // err is returned
+			if err != nil {
+				// Edge case: when the trip consists of walking only (how I discovered
+				// this) or if there is no changes, then a '-'  might be displayed
+				// instead. This fixes this issue, but is not the best solution.
+
+				// count as 0
+				changes = 0
+				err = nil
+			}
+
 			fare = res[2].Text()
 			return
 		}

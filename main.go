@@ -3,8 +3,6 @@
 // Author: Jørgen Bele Reinfjell
 // Description: AtB route planner cli
 
-// TODO: Support boats, etc.
-
 package main
 
 import (
@@ -12,9 +10,9 @@ import (
 	"github.com/b4b4r07/go-finder"
 	"github.com/b4b4r07/go-finder/source"
 	"github.com/docopt/docopt-go"
-	//"github.com/jorgenbele/go-atb/atb"
-	"go-atb/atb"
-	"os"
+	"github.com/jorgenbele/go-atb/atb"
+	//"go-atb/atb"
+	//"os"
 	"strconv"
 	"strings"
 )
@@ -114,20 +112,20 @@ Options:
 	}
 
 	opts.Bind(&config)
-	fmt.Println(config)
 
 	var to, from string
-	// Get suggestions in parallell.
 	if config.NoSuggestions {
 		from, to = config.FromArg, config.ToArg
 	} else {
+        // Get suggestions in parallel.
 		from, to = getSuggestions(config.FromArg, config.ToArg)
 	}
 
 	deps, err := atb.GetDeparturesNow(1, from, to)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Unable to get departures: %v\n", err)
-		os.Exit(1)
+		panic(fmt.Sprintf("Unable to get departures: %v\n", err))
+		//fmt.Fprintf(os.Stderr, "Error: Unable to get departures: %v\n", err)
+		//os.Exit(1)
 	}
 
 	fmt.Printf(bold(":: From %s to %s\n"), from, to)
