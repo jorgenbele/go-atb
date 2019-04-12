@@ -101,42 +101,95 @@ func dateTimeMerge(datestr, timestr string) (time.Time, error) {
 }
 
 func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Error occoured, error that caused is stored in 'err'
+			// and will be returned.
+		}
+	}()
+
+	// Closures to ease error handling.
+	find := func(root soup.Root, args ...string) (res soup.Root) {
+		// Panic if err != nil, will be catched by deferred recover() as
+		// seen above.
+		if err != nil {
+			panic(err)
+			return
+		}
+		res = root.Find(args...)
+		err = res.Error
+		return
+	}
+
+	findStrict := func(root soup.Root, args ...string) (res soup.Root) {
+		if err != nil {
+			panic(err)
+			return
+		}
+		res = root.FindStrict(args...)
+		err = res.Error
+		return
+	}
+
+	findAll := func(root soup.Root, args ...string) (res []soup.Root) {
+		if err != nil {
+			panic(err)
+			return
+		}
+		res = root.FindAll(args...)
+		for _, r := range res {
+			if r.Error != nil {
+				err = r.Error
+				panic(err)
+				break
+			}
+		}
+		return
+	}
+
+	findAllStrict := func(root soup.Root, args ...string) (res []soup.Root) {
+		if err != nil {
+			panic(err)
+			return
+		}
+		res = root.FindAllStrict(args...)
+		for _, r := range res {
+			if r.Error != nil {
+				err = r.Error
+				panic(err)
+				break
+			}
+		}
+		return
+	}
+
 	html, err := getDeparturesResp(dir, from, to, dtime, ddate)
 	if err != nil {
 		return
 	}
 
 	doc := soup.HTMLParse(html)
-    if err = doc.Error; err != nil {
-        return
-    }
-	mainContent := doc.FindStrict("div", "class", "maincontent")
-    if err = mainContent.Error; err != nil {
-        return
-    }
+	if err = doc.Error; err != nil {
+		return
+	}
+
+	mainContent := findStrict(doc, "div", "class", "maincontent")
 
 	// Used when parsing start and end times.
-	date := doc.FindStrict("h2", "class", "tm-alpha tm-reiseforslag-header")
-    if err = date.Error; err != nil {
-        return
-    }
+	date := findStrict(doc, "h2", "class", "tm-alpha tm-reiseforslag-header")
+	if err = date.Error; err != nil {
+		return
+	}
 
-    dateStr := date.Text()
-	resultWrappers := mainContent.FindAllStrict("div", "class", "tm-result-wrapper")
+	dateStr := date.Text()
+	resultWrappers := findAllStrict(mainContent, "div", "class", "tm-result-wrapper")
 
 	for _, rw := range resultWrappers {
 		var d Departure
 
-        if err = rw.Error; err != nil {
-            return
-        }
-
 		// The tm-block-b span contains:
 		//     start and end time, duration, changes and fare
-		blockB := rw.FindStrict("span", "class", "tm-block-b");
-        if err = blockB.Error; err != nil {
-            return
-        }
+		blockB := findStrict(rw, "span", "class", "tm-block-b")
 
 		// tm-block-b contains two tm-result-time-wrapper elements
 		// where the first one is the start time, and the second
@@ -152,25 +205,20 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 			return
 		}
 		d.Start, d.End, err = unpackTime(blockB.FindAll("span", "class", "tm-result-fratil"))
-        if err != nil {
-            return
-        }
+		if err != nil {
+			return
+		}
 
 		// tm-result-details-extra contains three tm-result-info elements:
 		// 1. duration, 2. changes, 3. fare
 		// The 'tm-result-info-val' element contains the string describing each
 		// element previously described.
-		extraDetails := blockB.FindStrict("span", "class", "tm-inline-block tm-result-details-extra")
-        if err = extraDetails.Error; err != nil {
-            return
-        }
+		extraDetails := findStrict(blockB, "span", "class", "tm-inline-block tm-result-details-extra")
+
 		spanClasses := []string{"tm-result-value-time", "tm-result-value-change", "tm-result-value-price"}
 		values := [3]soup.Root{}
 		for i, className := range spanClasses {
-			values[i] = extraDetails.Find("span", "class", className).Find("span", "class", "tm-result-info-val")
-            if err = values[i].Error; err != nil {
-                return
-            }
+			values[i] = find(extraDetails, "span", "class", className).Find("span", "class", "tm-result-info-val")
 		}
 
 		parseDuration := func(duration string) (d time.Duration, err error) {
@@ -187,7 +235,7 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 		unpackExtraDetails := func(res [3]soup.Root) (duration time.Duration, changes int, fare string, err error) {
 			duration, err = parseDuration(res[0].Text())
 			if err != nil {
-                return
+				return
 			}
 			changes, err = strconv.Atoi(res[1].Text()) // err is returned
 			fare = res[2].Text()
@@ -195,38 +243,28 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 		}
 
 		d.Duration, d.Changes, d.Fare, err = unpackExtraDetails(values)
-        if err != nil {
-            return
-        }
+		if err != nil {
+			return
+		}
 
 		// The various travel destinations that the trip from A to B
 		// has to go through. This is a list consisting of transportation
 		// methods that is used. For example: {"38"} if the entire trip
 		// consists of taking route 38.
-		routeSpan := mainContent.FindStrict("span", "class", "tm-det-wrapper tm-alpha8")
-        if err = routeSpan.Error; err != nil {
-            return
-        }
+		routeSpan := findStrict(mainContent, "span", "class", "tm-det-wrapper tm-alpha8")
 
 		// Treat the children as an ordered list of edges from travel method
 		// to travel method.
-		travelDests := routeSpan.FindAll("span", "class", "tm-det")
+		travelDests := findAll(routeSpan, "span", "class", "tm-det")
 
 		for _, td := range travelDests {
 			var t Transport
-
-            if err = td.Error; err != nil {
-                return
-            }
 
 			// Each td has a span 'tm-det-text-walk' and a span 'tm-det-transport' (containing
 			// 'tm-det-linenr'). To determine if the transport method is walking or by bus
 			// check if 'tm-det-text-walk' is non-empty, as it should contain "Walking"
 			// if the given transport is walking, and empty if by bus (or other transport).
-			walkSpan := td.FindStrict("span", "class", "tm-det-text tm-det-text-walk")
-            if err = walkSpan.Error; err != nil {
-                return
-            }
+			walkSpan := findStrict(td, "span", "class", "tm-det-text tm-det-text-walk")
 
 			walkText := walkSpan.Text()
 
@@ -236,18 +274,15 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 			} else {
 				t.Type = TransportBus
 
-				lineNumStr := td.FindStrict("span", "class", "tm-det-linenr").Text()
+				lineNumStr := findStrict(td, "span", "class", "tm-det-linenr").Text()
 				t.LineNum, err = strconv.Atoi(lineNumStr)
 				if err != nil {
-                    return
+					return
 				}
 			}
 
 			// Each td also contains a span with the time 'tm-det-time'.
-			detTimeSpan := td.FindStrict("span", "class", "ui-helper-hidden-accessible tm-det-time")
-            if err = detTimeSpan.Error; err != nil {
-                return
-            }
+			detTimeSpan := findStrict(td, "span", "class", "ui-helper-hidden-accessible tm-det-time")
 			t.Start, _ = dateTimeMerge(dateStr, detTimeSpan.Text())
 
 			d.Route = append(d.Route, t)

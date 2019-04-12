@@ -14,6 +14,7 @@ import (
 	"github.com/docopt/docopt-go"
 	//"github.com/jorgenbele/go-atb/atb"
 	"go-atb/atb"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -123,7 +124,11 @@ Options:
 		from, to = getSuggestions(config.FromArg, config.ToArg)
 	}
 
-	deps, _ := atb.GetDeparturesNow(1, from, to)
+	deps, err := atb.GetDeparturesNow(1, from, to)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Unable to get departures: %v\n", err)
+		os.Exit(1)
+	}
 
 	fmt.Printf(bold(":: From %s to %s\n"), from, to)
 	printPlanMinimal(deps)
