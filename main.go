@@ -3,13 +3,15 @@
 // Author: Jørgen Bele Reinfjell
 // Description: AtB route planner cli
 
+// TODO: Support boats, etc.
+
 package main
 
 import (
 	"fmt"
 	"github.com/b4b4r07/go-finder"
 	"github.com/b4b4r07/go-finder/source"
-    "github.com/docopt/docopt-go"
+	"github.com/docopt/docopt-go"
 	"github.com/jorgenbele/go-atb/atb"
 	"strconv"
 	"strings"
@@ -36,77 +38,88 @@ func printPlanMinimal(deps []atb.Departure) {
 	}
 }
 
-func main() {
-    usage := `AtB Travel Planner
-
-Usage: atb <from> <to>`
-
-    args, err := docopt.ParseDoc(usage)
-    if err != nil {
-        panic(fmt.Sprintf("Unable to parse arguments: %v\n", err))
-    }
-
-	fromArg, err := args.String("<from>")
-    if err != nil {
-        panic(err)
-    }
-
-	toArg, err := args.String("<to>")
-    if err != nil {
-        panic(err)
-    }
-
-	// Get suggestions in parallell.
+func getSuggestions(from, to string) (selFrom, selTo string) {
 	fromChan := make(chan []string)
 	toChan := make(chan []string)
 
-	go func() {
-		v, err := atb.GetSuggestions(fromArg)
+	f := func(query string, resChan chan []string) {
+		v, err := atb.GetSuggestions(query)
 		if err != nil {
 			panic(fmt.Sprintf("Unable to get suggestion: %v", err))
 		}
-		fromChan <- v
-	}()
+		resChan <- v
+	}
 
-	go func() {
-		v, err := atb.GetSuggestions(toArg)
-		if err != nil {
-			panic(fmt.Sprintf("Unable to get suggestion: %v", err))
-		}
-		toChan <- v
-	}()
+	go f(from, fromChan)
+	go f(to, toChan)
 
 	sFrom := <-fromChan
 	sTo := <-toChan
 
-	// TODO: Add cli flag.
-	finder, err := finder.New()
-	if err != nil {
-		panic(err)
+	// Lazy init the finder only when needed.
+	var finder_ finder.Finder
+	finder_ = nil
+
+	userSelect := func(orig string, suggestions []string) string {
+		switch len(suggestions) {
+		case 0:
+			return orig
+		case 1:
+			return suggestions[0]
+		default:
+			if finder_ == nil {
+				var err error
+				finder_, err = finder.New()
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			finder_.Read(source.Slice(suggestions))
+			selected, err := finder_.Run()
+			if err != nil {
+				panic(err)
+			}
+			// Take the first one, assume the user selected only one.
+			return selected[0]
+		}
 	}
 
-	//fmt.Println(sFrom, sTo)
+	selFrom = userSelect(from, sFrom)
+	selTo = userSelect(to, sTo)
+	return
+}
+
+func main() {
+	usage := `AtB Travel Planner
+
+Usage: atb <from> <to> [options]
+
+Options:
+    --no-suggestions    Always send 'from' and 'to' as provided.
+`
+	var opts docopt.Opts
+	var err error
+
+	var config struct {
+		ToArg         string `docopt:"<to>"`
+		FromArg       string `docopt:"<from>"`
+		NoSuggestions bool   `docopt:"--no-suggestions"`
+	}
+
+	if opts, err = docopt.ParseDoc(usage); err != nil {
+		panic(fmt.Sprintf("Unable to parse arguments: %v\n", err))
+	}
+
+	opts.Bind(&config)
+	fmt.Println(config)
+
 	var to, from string
-	if len(sFrom) < 2 {
-		from = sFrom[0]
+	// Get suggestions in parallell.
+	if config.NoSuggestions {
+		from, to = config.FromArg, config.ToArg
 	} else {
-		finder.Read(source.Slice(sFrom))
-		toSlice, err := finder.Run()
-		if err != nil {
-			panic(err)
-		}
-		from = toSlice[0]
-	}
-
-	if len(sTo) < 2 {
-		to = sTo[0]
-	} else {
-		finder.Read(source.Slice(sTo))
-		toSlice, err := finder.Run()
-		if err != nil {
-			panic(err)
-		}
-		to = toSlice[0]
+		from, to = getSuggestions(config.FromArg, config.ToArg)
 	}
 
 	deps, _ := atb.GetDeparturesNow(1, from, to)
