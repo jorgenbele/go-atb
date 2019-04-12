@@ -4,18 +4,15 @@
 // Description: AtB route plannner cli to get next departure
 //
 
-package main
+package atb
 
 import (
 	"fmt"
 	"github.com/anaskhan96/soup"
 	"github.com/levigross/grequests"
-    "github.com/b4b4r07/go-finder/source"
-    "github.com/b4b4r07/go-finder"
 	"strconv"
 	"strings"
 	"time"
-    "os"
 )
 
 // URL for the 'suggestions' endpoint.
@@ -36,7 +33,7 @@ func GetSuggestions(query string) ([]string, error) {
 		return nil, err
 	}
 
-    var sr SuggestionRes
+	var sr SuggestionRes
 	err = resp.JSON(&sr)
 	return sr.Suggestions, err
 }
@@ -226,85 +223,94 @@ func GetDeparturesNow(dir int, from, to string) ([]Departure, error) {
 	return GetDepartures(dir, from, to, dtime, ddate)
 }
 
-func printPlanMinimal(deps []Departure) {
-    fmt.Printf("%-5s| %-3s |%3s|%4s|%1s|%-10s\n", "Start", "End", "Durat", "Chan", "F", "Route")
-    for _, d := range deps {
-        route := make([]string, len(d.Route))
-        for _, r := range d.Route {
-            if r.Type == TransportBus {
-                route = append(route, strconv.Itoa(r.LineNum))
-            } else {
-                route = append(route, r.WalkText)
-            }
-        }
-        routeStr := route[0] + strings.Join(route[1:], " ⟶  ")
-        fmt.Printf("%02d:%02d|%02d:%02d|%3.0f m|%4d|%1s|%s\n", d.Start.Hour(), d.Start.Minute(), d.End.Hour(), d.End.Minute(), d.Duration.Minutes(), d.Changes, d.Fare, routeStr)
-    }
-}
-
-func main() {
-    fromArg := os.Args[1]
-    toArg := os.Args[2]
-
-    // Get suggestions in parallell.
-    fromChan := make(chan []string)
-    toChan := make(chan []string)
-
-    go func() {
-        v, _ := GetSuggestions(fromArg)
-        //fmt.Println("Got from:", v)
-        fromChan <- v
-    }()
-
-    go func() {
-        v, _ := GetSuggestions(toArg)
-        //fmt.Println("Got to:", v)
-        toChan <- v
-    }()
-
-    sFrom := <-fromChan
-    sTo := <-toChan
-
-    // TODO: Add cli flag.
-    finder, err := finder.New()
-    if err != nil {
-        panic(err)
-    }
-
-	//fmt.Println(sFrom, sTo)
-    var to, from string
-    if len(sFrom) < 2 {
-        from = sFrom[0]
-    } else {
-        finder.Read(source.Slice(sFrom))
-        toSlice, err := finder.Run()
-        if err != nil {
-            panic(err)
-        }
-        from = toSlice[0]
-    }
-
-
-    if len(sTo) < 2 {
-        to = sTo[0]
-    } else {
-        finder.Read(source.Slice(sTo))
-        fromSlice, err := finder.Run()
-        if err != nil {
-            panic(err)
-        }
-        from = fromSlice[0]
-    }
-
-	deps, _ := GetDeparturesNow(1, from, to)
-	//fmt.Println(deps)
-
-	fmt.Printf("From %s to %s\n", from, to)
-    printPlanMinimal(deps)
-
-
-	//now := time.Now()
-	//dtime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
-	//ddate := fmt.Sprintf("%02d.%02d.%02d", now.Day(), now.Month(), now.Year())
-	//getDeparturesResp(1, "Konglevegen (Trondheim)", "Munkegata (Trondheim)", dtime, ddate)
-}
+//
+//func bold(s string) string {
+//	return fmt.Sprintf("\033[1m%s\033[0m", s)
+//}
+//
+//func printPlanMinimal(deps []Departure) {
+//	fmt.Printf("%-5s| %-3s |%3s|%4s|%1s|%-10s\n", "Start", "End", "Durat", "Chan", "F", "Route")
+//	for _, d := range deps {
+//		route := make([]string, len(d.Route))
+//		for i, r := range d.Route {
+//			if r.Type == TransportBus {
+//				route[i] = strconv.Itoa(r.LineNum)
+//			} else {
+//				route[i] = r.WalkText
+//			}
+//		}
+//		routeStr := strings.Join(route, " ⟶  ")
+//		fmt.Printf("%02d:%02d|%02d:%02d|%3.0f m|%4d|%1s|%s\n", d.Start.Hour(), d.Start.Minute(), d.End.Hour(), d.End.Minute(),
+//			d.Duration.Minutes(), d.Changes, d.Fare, routeStr)
+//	}
+//}
+//
+//func main() {
+//
+//
+//	if len(os.Args[1:]) != 2 {
+//		fmt.Fprintf(os.Stderr, "Usage: %s <from> <to>", os.Args[0])
+//		os.Exit(1)
+//	}
+//
+//	fromArg := os.Args[1]
+//	toArg := os.Args[2]
+//
+//	// Get suggestions in parallell.
+//	fromChan := make(chan []string)
+//	toChan := make(chan []string)
+//
+//	go func() {
+//		v, err := GetSuggestions(fromArg)
+//		if err != nil {
+//			panic(fmt.Sprintf("Unable to get suggestion: %v", err))
+//		}
+//		fromChan <- v
+//	}()
+//
+//	go func() {
+//		v, err := GetSuggestions(toArg)
+//		if err != nil {
+//			panic(fmt.Sprintf("Unable to get suggestion: %v", err))
+//		}
+//		toChan <- v
+//	}()
+//
+//	sFrom := <-fromChan
+//	sTo := <-toChan
+//
+//	// TODO: Add cli flag.
+//	finder, err := finder.New()
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	//fmt.Println(sFrom, sTo)
+//	var to, from string
+//	if len(sFrom) < 2 {
+//		from = sFrom[0]
+//	} else {
+//		finder.Read(source.Slice(sFrom))
+//		toSlice, err := finder.Run()
+//		if err != nil {
+//			panic(err)
+//		}
+//		from = toSlice[0]
+//	}
+//
+//	if len(sTo) < 2 {
+//		to = sTo[0]
+//	} else {
+//		finder.Read(source.Slice(sTo))
+//		fromSlice, err := finder.Run()
+//		if err != nil {
+//			panic(err)
+//		}
+//		from = fromSlice[0]
+//	}
+//
+//	deps, _ := GetDeparturesNow(1, from, to)
+//
+//	fmt.Printf(bold(":: From %s to %s\n"), from, to)
+//	printPlanMinimal(deps)
+//}
