@@ -1,6 +1,6 @@
 * go-atb
 ~go-atb~ is a cli for AtB's travel planner. (see: atb.no)
-It is separated into a go package (~atb/~) which can be reused for
+It is separated into a go package (~atb~) which can be reused for
 other purposes and a cli program (~main.go~).
 
 ** How to install
@@ -12,24 +12,28 @@ go get github.com/jorgenbele/go-atb
 #+BEGIN_SRC sh
 AtB Travel Planner
 
-Usage: atb <from> <to> [options]
-
-Options:
-    --no-suggestions    Always send 'from' and 'to' as provided.
+Usage: atb (<from> <to> [--no-suggestions]| --suggestions <query>)
 #+END_SRC
 
-** Gif
+** Gif (outdated)
 [[./go-atb-demo-1.gif]]
 
 ** Examples
 *** Without suggestions
 #+BEGIN_SRC sh
 $ ./go-atb --no-suggestions Olav Tryggvasons gt. (Trondheim) Studentersamfundet (Trondheim)
-From Olav Tryggvasons gt. (Trondheim) to Studentersamfundet (Trondheim)
-Start| End |Durat|Chan|F|Route     
-11:42|16:16|274 m|   1|-|Walk ⟶  905 ⟶  905
-11:37|15:16|219 m|   1|-|Walk ⟶  905 ⟶  905
-16:27|21:16|289 m|   1|-|Walk ⟶  905 ⟶  905
+:: From Olav Tryggvasons gt. (Trondheim) to Studentersamfundet (Trondheim)
+START  END    DUR  C  F  RO
+12:35  12:40  5 m  0  -  46
+12:37  12:42  5 m  0  -  46
+12:38  12:43  5 m  0  -  46
+12:39  12:44  5 m  0  -  46
+12:45  12:50  5 m  0  -  46
+12:50  12:55  5 m  0  -  46
+12:51  12:56  5 m  0  -  46
+12:52  12:57  5 m  0  -  46
+12:54  12:59  5 m  0  -  46
+12:58  13:03  5 m  0  -  46
 #+END_SRC
 
 *** With suggestions
@@ -37,8 +41,26 @@ Start| End |Durat|Chan|F|Route
 $ ./go-atb olav stud
 # The user must choose from a list of bus stops (suggestions)
 From Olav Tryggvasons gt. (Trondheim) to Studentersamfundet (Trondheim)
-Start| End |Durat|Chan|F|Route     
-11:42|16:16|274 m|   1|-|Walk ⟶  905 ⟶  905
-11:37|15:16|219 m|   1|-|Walk ⟶  905 ⟶  905
-16:27|21:16|289 m|   1|-|Walk ⟶  905 ⟶  905
+START  END    DUR  C  F  RO
+12:35  12:40  5 m  0  -  46
+12:37  12:42  5 m  0  -  46
+12:38  12:43  5 m  0  -  46
+12:39  12:44  5 m  0  -  46
+12:45  12:50  5 m  0  -  46
+12:50  12:55  5 m  0  -  46
+12:51  12:56  5 m  0  -  46
+12:52  12:57  5 m  0  -  46
+12:54  12:59  5 m  0  -  46
+12:58  13:03  5 m  0  -  46
+#+END_SRC
+
+*** Only suggestions
+#+BEGIN_SRC sh
+$ ./go-atb --suggestions stud
+Studentersamfundet (Trondheim)
+Studentersamfundet 2 (Trondheim)
+Berg studentby (Trondheim)
+Moholt studentby (Trondheim)
+Voll studentby (Trondheim)
+Moan studentbolig (Levanger)
 #+END_SRC
