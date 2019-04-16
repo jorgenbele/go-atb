@@ -65,7 +65,17 @@ type Departure struct {
 	Route    []Transport
 }
 
-func getDeparturesResp(dir int, from, to, dtime, ddate string) (resp string, err error) {
+// getDeparturesResp is used to get departures for both realtime departures
+// and planned departures. It seems like the endpoint checks "adv" and "dep1"
+// do determine whether to return a realtime departure list or the planned
+// route departures.
+func getDeparturesResp(dir int, from, to, dtime, ddate string, realtime bool) (resp string, err error) {
+	var advStr, dep1 string
+	if realtime {
+		advStr = "1" // XXX - Is this necessary?
+		dep1 = "1"
+	}
+
 	ro := &grequests.RequestOptions{
 		UserAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36",
 		Params: map[string]string{
@@ -76,6 +86,8 @@ func getDeparturesResp(dir int, from, to, dtime, ddate string) (resp string, err
 			"date":      ddate,
 			"search":    "Show travel suggestions",
 			"lang":      "en",
+			"adv":       advStr,
+			"dep1":       dep1,
 			//"through":       "",
 			//"throughpause":  "",
 			//"changepenalty": "1",
@@ -164,7 +176,7 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 		return
 	}
 
-	html, err := getDeparturesResp(dir, from, to, dtime, ddate)
+	html, err := getDeparturesResp(dir, from, to, dtime, ddate, false)
 	if err != nil {
 		return
 	}
@@ -311,4 +323,172 @@ func GetDeparturesNow(dir int, from, to string) ([]Departure, error) {
 	ddate := fmt.Sprintf("%02d.%02d.%02d", now.Day(), now.Month(), now.Year())
 
 	return GetDepartures(dir, from, to, dtime, ddate)
+}
+
+type RealtimeDeparture struct {
+	Transport  Transport
+	IsRealtime bool
+	LocationID int
+	Towards    string
+}
+
+func GetRealtimeDepartures(dir int, from string) (rdeps []RealtimeDeparture, err error) {
+	// Same error-handling as in GetDepartures.
+	defer func() {
+		if r := recover(); r != nil {
+			// Error occoured, error that caused is stored in 'err'
+			// and will be returned.
+		}
+	}()
+
+	// Closures to ease error handling.
+	find := func(root soup.Root, args ...string) (res soup.Root) {
+		// Panic if err != nil, will be catched by deferred recover() as
+		// seen above.
+		if err != nil {
+			panic(err)
+			return
+		}
+		res = root.Find(args...)
+		err = res.Error
+		return
+	}
+
+	findStrict := func(root soup.Root, args ...string) (res soup.Root) {
+		if err != nil {
+			panic(err)
+			return
+		}
+		res = root.FindStrict(args...)
+		err = res.Error
+		return
+	}
+
+	findAll := func(root soup.Root, args ...string) (res []soup.Root) {
+		if err != nil {
+			panic(err)
+			return
+		}
+		res = root.FindAll(args...)
+		for _, r := range res {
+			if r.Error != nil {
+				err = r.Error
+				panic(err)
+				break
+			}
+		}
+		return
+	}
+
+	findAllStrict := func(root soup.Root, args ...string) (res []soup.Root) {
+		if err != nil {
+			panic(err)
+			return
+		}
+		res = root.FindAllStrict(args...)
+		for _, r := range res {
+			if r.Error != nil {
+				err = r.Error
+				panic(err)
+				break
+			}
+		}
+		return
+	}
+
+
+	now := time.Now()
+	dtime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
+	ddate := fmt.Sprintf("%02d.%02d.%02d", now.Day(), now.Month(), now.Year())
+
+	html, err := getDeparturesResp(dir, from, "", dtime, ddate, true)
+	if err != nil {
+		return []RealtimeDeparture{}, nil
+	}
+	//fmt.Println(html)
+
+	doc := soup.HTMLParse(html)
+	if err = doc.Error; err != nil {
+		return
+	}
+
+	mainContent := findStrict(doc, "div", "class", "maincontent")
+
+	// Used when parsing start and end times.
+	date := findStrict(doc, "span", "class", "tm-avgangstider-dato")
+	if err = date.Error; err != nil {
+		return
+	}
+	dateStr := date.Text()
+
+	departurelistDiv := findStrict(mainContent, "div", "id", "tm-departurelist")
+
+	// Normally two groups (it seems), one for each direction.
+	// One can differentiate the two by their 'data-tm-locationid' field on the
+	// 'tm-selectlist-button tm-velgfrasted-nr' span
+	// or by checking the text value of the 'ui-state-default ui-corner-all' span.
+	departureGroups := findAllStrict(departurelistDiv, "li", "class", "tm-group-header-item")
+
+	for _, dg := range departureGroups {
+
+		locationSpan := findStrict(dg, "span", "class", "ui-state-default ui-corner-all")
+		var locationID int
+		locationID, err = strconv.Atoi(locationSpan.Text())
+		if err != nil {
+			return
+		}
+		//fmt.Printf("locationID: %d\n", locationID)
+
+		// TODO: Support other transport types than bus.
+		departuresLi := findAll(dg, "li", "class", "tm-departurelist-item")
+		for _, dli := range departuresLi {
+			var rd RealtimeDeparture
+
+			rd.LocationID = locationID
+
+			// tm-overvaket  tm-nytid
+			attrs := dli.Attrs()
+			if val, ok := attrs["class"]; ok {
+				//fmt.Printf("attrs class: %s\n", val)
+				fields := strings.Fields(val)
+				var hasOvervaket, hasNytid bool
+				for _, f := range fields {
+					if f == "tm-overvaket" {
+						hasOvervaket = true
+					} else if f == "tm-nytid" {
+						hasNytid = true
+					}
+				}
+
+				if hasOvervaket && hasNytid {
+					rd.IsRealtime = true
+				}
+
+			} else {
+				return
+			}
+
+			rd.Transport.Type = TransportBus
+
+			linenameStrong := findStrict(dli, "strong", "class", "tm-departurelist-linename")
+			rd.Transport.LineNum, err = strconv.Atoi(strings.TrimSpace(linenameStrong.Text()))
+			if err != nil {
+				return
+			}
+
+			towardsSpan := find(dli, "span", "class", "tm-departurelist-destination")
+			rd.Towards = strings.TrimSpace(towardsSpan.Text())
+
+			departureTimeSpan := find(dli, "span", "class", "tm-departurelist-time")
+			rd.Transport.Start, err = dateTimeMerge(dateStr, strings.TrimSpace(departureTimeSpan.Text()))
+			if err != nil {
+				return
+			}
+
+			//fmt.Printf("transport: %v\n", rd.Transport)
+			//fmt.Printf("realtimedeparture: %v\n", rd)
+			rdeps = append(rdeps, rd)
+		}
+	}
+	return
 }

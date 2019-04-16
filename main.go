@@ -19,6 +19,37 @@ func bold(s string) string {
 	return fmt.Sprintf("\033[1m%s\033[0m", s)
 }
 
+func max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+}
+
+func min(x, y int) int {
+	if x > y {
+		return y
+	}
+	return x
+}
+
+func printRow(row []string, cw []int, spacing int, bold bool) {
+	if bold {
+		fmt.Printf("\033[1m")
+	}
+
+	for i, c := range row[:len(row)-1] {
+		fmt.Printf("%-*s%*c", cw[i], c[:min(cw[i], len(c))], spacing, ' ')
+	}
+	li := len(row)-1
+	lc := row[li]
+	fmt.Printf("%-*s\n", cw[li], lc[:min(cw[li], len(lc))])
+
+	if bold {
+		fmt.Printf("\033[0m")
+	}
+}
+
 func printPlanMinimal(deps []atb.Departure) {
 	fmt.Printf("%-5s| %-3s |%3s|%4s|%1s|%-10s\n", "Start", "End", "Durat", "Chan", "F", "Route")
 	for _, d := range deps {
@@ -36,7 +67,63 @@ func printPlanMinimal(deps []atb.Departure) {
 	}
 }
 
-func printPlanTabular(deps []atb.Departure) {
+func printRealtimeList(rdeps []atb.RealtimeDeparture, allowBold bool) {
+	header := []string{"ROUTE", "TIME", "TOWARDS", "REALTIME"}
+	spacing := 2
+
+	rows := make([][]string, len(rdeps))
+	cw := make([]int, len(header))
+	bold := make([]bool, len(rdeps))
+
+	for i, d := range rdeps {
+		var rtStr string
+
+		if d.IsRealtime {
+			rtStr = "TRUE"
+			bold[i] = true
+		} else {
+			rtStr = "FALSE"
+		}
+
+		rows[i] = []string{
+			fmt.Sprintf("%5d", d.Transport.LineNum),
+			fmt.Sprintf("%02d:%02d", d.Transport.Start.Hour(), d.Transport.Start.Minute()),
+			fmt.Sprintf("%s", d.Towards),
+			fmt.Sprintf("%s", rtStr),
+		}
+
+		for j, c := range rows[i] {
+			cw[j] = max(cw[j], len(c))
+		}
+	}
+
+	printRow(header, cw, spacing, false)
+	for i, r := range rows {
+		printRow(r, cw, spacing, bold[i] && allowBold)
+	}
+}
+
+type symbols struct {
+	routeSplit string
+
+	bus     string
+	train   string
+	tram    string
+	walking string
+
+	start    string
+	end      string
+	duration string
+	changes  string
+	fare     string
+
+	time     string
+	realtime string
+
+	towards string
+}
+
+func printPlanTabular(deps []atb.Departure, symb symbols) {
 	header := []string{"START", "END", "DURATION", "CHANGES", "FARE", "ROUTE"}
 	spacing := 2
 
@@ -48,27 +135,23 @@ func printPlanTabular(deps []atb.Departure) {
 		route := make([]string, len(d.Route))
 		for i, r := range d.Route {
 			if r.Type == atb.TransportBus {
-				route[i] = strconv.Itoa(r.LineNum)
+				//route[i] = fmt.strconv.Itoa(r.LineNum)
+				route[i] = fmt.Sprintf("%s%d", symb.bus, r.LineNum)
 			} else {
-				route[i] = r.WalkText
+				//route[i] = r.WalkText
+				route[i] = fmt.Sprintf("%s%s", symb.walking, r.WalkText)
 			}
 		}
-		routeStr := strings.Join(route, " ⟶  ")
+		routeStr := strings.Join(route, symb.routeSplit)
 
 		rows[i] = []string{
-			fmt.Sprintf("%02d:%02d", d.Start.Hour(), d.Start.Minute()),
-			fmt.Sprintf("%02d:%02d", d.End.Hour(), d.End.Minute()),
-			fmt.Sprintf("%v m", d.Duration.Minutes()),
-			fmt.Sprintf("%d", d.Changes),
-			string(d.Fare),
+			fmt.Sprintf("%s%02d:%02d", symb.start, d.Start.Hour(), d.Start.Minute()),
+			fmt.Sprintf("%s%02d:%02d", symb.end, d.End.Hour(), d.End.Minute()),
+			fmt.Sprintf("%s%vm", symb.duration, d.Duration.Minutes()),
+			fmt.Sprintf("%s%d", symb.changes, d.Changes),
+			fmt.Sprintf("%s%s", symb.fare, d.Fare),
+			//string(d.Fare),
 			routeStr,
-		}
-
-		max := func(x, y int) int {
-			if x > y {
-				return x
-			}
-			return y
 		}
 
 		for j, c := range rows[i] {
@@ -76,31 +159,9 @@ func printPlanTabular(deps []atb.Departure) {
 		}
 	}
 
-	// start :padding: end :padding: duration :padding: changes :padding: fare :padding: route
-	format := "%-*s%*c %-*s%*c %-*s%*c %-*s%*c %-*s%*c %-*s\n"
-
-	min := func(x, y int) int {
-		if x > y {
-			return y
-		}
-		return x
-	}
-
-	h := header
-	fmt.Printf(format, cw[0], h[0][:min(cw[0], len(h[0]))], spacing-1, ' ',
-		cw[1], h[1][:min(cw[1], len(h[1]))], spacing-1, ' ',
-		cw[2], h[2][:min(cw[2], len(h[2]))], spacing-1, ' ',
-		cw[3], h[3][:min(cw[3], len(h[3]))], spacing-1, ' ',
-		cw[4], h[4][:min(cw[4], len(h[4]))], spacing-1, ' ',
-		cw[5], h[5][:min(cw[5], len(h[5]))])
-
+	printRow(header, cw, spacing, false)
 	for _, r := range rows {
-		fmt.Printf(format, cw[0], r[0], spacing-1, ' ',
-			cw[1], r[1], spacing-1, ' ',
-			cw[2], r[2], spacing-1, ' ',
-			cw[3], r[3], spacing-1, ' ',
-			cw[4], r[4], spacing-1, ' ',
-			cw[5], r[5])
+		printRow(r, cw, spacing, false)
 	}
 }
 
@@ -159,7 +220,7 @@ func getSuggestions(from, to string) (selFrom, selTo string) {
 func main() {
 	usage := `AtB Travel Planner
 
-Usage: atb (<from> <to> [--no-suggestions]| --suggestions <query>)
+Usage: atb [--terse] ((--realtime <from> | <from> <to>) [--no-suggestions] | --suggestions <query>)
 `
 	var opts docopt.Opts
 	var err error
@@ -170,6 +231,8 @@ Usage: atb (<from> <to> [--no-suggestions]| --suggestions <query>)
 		NoSuggestions   bool   `docopt:"--no-suggestions"`
 		Query           string `docopt:"<query>"`
 		OnlySuggestions bool   `docopt:"--suggestions"`
+		Terse           bool   `docopt:"--terse"`
+		Realtime        bool   `docopt:"--realtime"`
 	}
 
 	if opts, err = docopt.ParseDoc(usage); err != nil {
@@ -177,6 +240,25 @@ Usage: atb (<from> <to> [--no-suggestions]| --suggestions <query>)
 	}
 
 	opts.Bind(&config)
+
+	var symbs symbols
+	if config.Terse {
+		symbs = symbols{routeSplit: ","}
+	} else {
+		symbs = symbols{
+			routeSplit: " ⟶  ",
+			bus:        "🚍",
+			train:      " ",
+			tram:       " ",
+			walking:    " ",
+			//towards:      " ",
+			//start:        " ",
+			//end:          " ",
+			//duration:     " ",
+			//fare:         "",
+			//changes:      "",
+		}
+	}
 
 	if config.OnlySuggestions {
 		v, err := atb.GetSuggestions(config.Query)
@@ -186,6 +268,34 @@ Usage: atb (<from> <to> [--no-suggestions]| --suggestions <query>)
 		for _, e := range v {
 			fmt.Printf("%v\n", e)
 		}
+		return
+	} else if config.Realtime {
+		var from string
+		if config.NoSuggestions {
+			from = config.FromArg
+		} else {
+			suggestions, err := atb.GetSuggestions(config.FromArg)
+
+			finder, err := finder.New()
+			if err != nil {
+				panic(err)
+			}
+
+			finder.Read(source.Slice(suggestions))
+			selected, err := finder.Run()
+			if err != nil {
+				panic(err)
+			}
+			// Take the first one, assume the user selected only one.
+			from = selected[0]
+		}
+
+		rdeps, err := atb.GetRealtimeDepartures(1, from)
+		if err != nil {
+			panic(err)
+		}
+
+		printRealtimeList(rdeps, !config.Terse)
 		return
 	}
 
@@ -199,12 +309,16 @@ Usage: atb (<from> <to> [--no-suggestions]| --suggestions <query>)
 
 	deps, err := atb.GetDeparturesNow(1, from, to)
 	if err != nil {
+		// Panic to get more debugging output.
 		panic(fmt.Sprintf("Unable to get departures: %v\n", err))
 		//fmt.Fprintf(os.Stderr, "Error: Unable to get departures: %v\n", err)
 		//os.Exit(1)
 	}
 
-	fmt.Printf(bold(":: From %s to %s\n"), from, to)
 	//printPlanMinimal(deps)
-	printPlanTabular(deps)
+	if !config.Terse {
+		fmt.Printf(bold(":: From %s to %s\n"), from, to)
+	}
+
+	printPlanTabular(deps, symbs)
 }
