@@ -12,7 +12,19 @@ go get github.com/jorgenbele/go-atb
 #+BEGIN_SRC sh
 AtB Travel Planner
 
-Usage: atb [--terse] ((--realtime <from> | <from> <to>) [--no-suggestions] | --suggestions <query>)
+Usage: atb [--terse] ((--realtime <from> [<route>] | <from> <to>) [--no-suggestions] | --suggestions <query>)
+
+Options:
+       --terse                        Disables bold lines and use of symbols
+
+       --realtime <from> [<route>]    Shows the realtime list of the busstation <from>, optionally
+                                      only displaying results concerning route <route>.
+
+       --no-suggestions               Disables the use of the suggestions feature which does a lookup
+                                      of stations with name <from> (and <to> if not --realtime). This
+                                      is useful when you have the complete unique name of a station.
+
+       --suggestions <query>          Does a station lookup using the string <query> and exits.
 #+END_SRC
 
 ** Gif (outdated)
