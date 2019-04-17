@@ -87,7 +87,7 @@ func getDeparturesResp(dir int, from, to, dtime, ddate string, realtime bool) (r
 			"search":    "Show travel suggestions",
 			"lang":      "en",
 			"adv":       advStr,
-			"dep1":       dep1,
+			"dep1":      dep1,
 			//"through":       "",
 			//"throughpause":  "",
 			//"changepenalty": "1",
@@ -395,7 +395,6 @@ func GetRealtimeDepartures(dir int, from string) (rdeps []RealtimeDeparture, err
 		}
 		return
 	}
-
 
 	now := time.Now()
 	dtime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())

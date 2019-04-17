@@ -12,16 +12,119 @@ go get github.com/jorgenbele/go-atb
 #+BEGIN_SRC sh
 AtB Travel Planner
 
-Usage: atb (<from> <to> [--no-suggestions]| --suggestions <query>)
+Usage: atb [--terse] ((--realtime <from> | <from> <to>) [--no-suggestions] | --suggestions <query>)
 #+END_SRC
 
 ** Gif (outdated)
 [[./go-atb-demo-1.gif]]
 
 ** Examples
-*** Without suggestions
+*** Realtime
 #+BEGIN_SRC sh
-$ ./go-atb --no-suggestions Olav Tryggvasons gt. (Trondheim) Studentersamfundet (Trondheim)
+$ go-atb --terse --no-suggestions --realtime 'Studentersamfundet (Trondheim)'
+ROUTE  TIME   TOWARDS               REALT
+  410  12:24  Orkanger              TRUE
+    7  12:24  Romolslia             TRUE
+   38  12:25  Brekkåsen snuplass    FALSE
+   11  12:25  Heggstadmyra          TRUE
+    8  12:26  Risvollan             FALSE
+   46  12:26  Sandmoen              TRUE
+   60  12:28  Lade                  TRUE
+    4  12:31  Heimdal               TRUE
+   66  12:34  Jakobsli              TRUE
+   19  12:35  Sandmoen              TRUE
+    9  12:37  Lundåsen              TRUE
+   46  12:41  Sandmoen              TRUE
+    3  12:42  Sjetnmarka            FALSE
+   55  12:42  Rate                  FALSE
+    6  12:43  Flatåsen              TRUE
+    8  12:45  Risvollan             TRUE
+    4  12:49  Heimdal               TRUE
+  310  12:49  Fannrem               TRUE
+    7  12:50  Romolslia             FALSE
+  340  12:51  Røros                 FALSE
+    9  12:55  Lundåsen              FALSE
+   38  12:55  Brekkåsen snuplass    FALSE
+   46  12:55  Sandmoen              FALSE
+    8  12:56  Risvollan             FALSE
+   60  12:56  Lade                  FALSE
+   54  12:57  Bratsberg             FALSE
+    4  12:59  Heimdal               FALSE
+    6  13:00  Flatåsen              FALSE
+   66  13:04  Jakobsli              FALSE
+   19  13:05  Sandmoen              FALSE
+   11  13:08  Heggstadmyra          FALSE
+   46  13:10  Sandmoen              FALSE
+    8  13:11  Steinåsen             FALSE
+    3  13:12  Sjetnmarka            FALSE
+   55  13:12  Rate                  FALSE
+    4  13:14  Heimdal               FALSE
+    9  13:15  Lundåsen              FALSE
+    6  13:20  Flatåsen              FALSE
+    7  13:20  Romolslia             FALSE
+  340  13:21  Støren                FALSE
+    9  12:22  Dragvoll              TRUE
+   55  12:25  Trondheim S           TRUE
+    4  12:26  Lade/Strindheim       TRUE
+    6  12:26  Værestrøa             TRUE
+    8  12:28  Stavset               TRUE
+    7  12:29  Vikåsen               TRUE
+   36  12:30  Sentrum               TRUE
+   46  12:33  Pirbadet              TRUE
+   54  12:33  Trondheim S           TRUE
+   11  12:34  Trolla                TRUE
+   19  12:35  Hurtigbåtterminalen   TRUE
+   60  12:37  Trondheim S           TRUE
+    3  12:37  Lade                  TRUE
+    9  12:38  Dragvoll              TRUE
+    4  12:42  Lade/Strindheim       TRUE
+    8  12:43  Stavset               TRUE
+   46  12:44  Pirbadet              FALSE
+  340  12:45  Trondheim             TRUE
+    6  12:46  Værestrøa             TRUE
+   38  12:50  Stjørdal stasjon      FALSE
+   55  12:50  Trondheim S           FALSE
+    4  12:52  Lade/Strindheim       FALSE
+    7  12:57  Vikåsen               FALSE
+    8  12:57  Stavset               FALSE
+    9  12:57  Dragvoll              FALSE
+  310  12:58  Stjørdal stasjon      FALSE
+   36  12:59  Sentrum               FALSE
+   46  12:59  Pirbadet              FALSE
+   19  13:04  Hurtigbåtterminalen   FALSE
+   60  13:04  Trondheim S           FALSE
+    3  13:05  Lade                  FALSE
+    6  13:06  Værestrøa             FALSE
+    4  13:07  Lade/Strindheim       FALSE
+    8  13:12  Stavset               FALSE
+   46  13:14  Pirbadet              FALSE
+    9  13:17  Dragvoll              FALSE
+   11  13:17  Trolla                FALSE
+   38  13:20  Stjørdal stasjon      FALSE
+   55  13:20  Trondheim S           FALSE
+   22  12:26  Vestlia               TRUE
+    5  12:27  Dragvoll/Lohove       TRUE
+    5  12:43  Dragvoll/Lohove       TRUE
+   22  12:46  Vestlia               TRUE
+   63  12:48  Lade                  TRUE
+    5  12:54  Dragvoll/Lohove       FALSE
+   22  13:03  Vestlia               FALSE
+    5  13:09  Dragvoll/Lohove       FALSE
+   63  13:18  Lade                  FALSE
+   63  12:21  Ilsvika               FALSE
+   22  12:26  Tyholt                TRUE
+    5  12:30  Buenget               TRUE
+    5  12:44  Buenget               TRUE
+   22  12:46  Tyholt                TRUE
+   63  12:51  Ilsvika               FALSE
+    5  12:59  Buenget               FALSE
+   22  13:06  Tyholt                FALSE
+    5  13:14  Buenget               FALSE
+#+END_SRC sh
+*** Travel planner
+**** Without suggestions
+#+BEGIN_SRC sh
+$ go-atb --no-suggestions 'Olav Tryggvasons gt. (Trondheim)' 'Studentersamfundet (Trondheim)'
 :: From Olav Tryggvasons gt. (Trondheim) to Studentersamfundet (Trondheim)
 START  END    DUR  C  F  RO
 12:35  12:40  5 m  0  -  46
@@ -36,9 +139,9 @@ START  END    DUR  C  F  RO
 12:58  13:03  5 m  0  -  46
 #+END_SRC
 
-*** With suggestions
+**** With suggestions
 #+BEGIN_SRC sh
-$ ./go-atb olav stud
+$ go-atb olav stud
 # The user must choose from a list of bus stops (suggestions)
 From Olav Tryggvasons gt. (Trondheim) to Studentersamfundet (Trondheim)
 START  END    DUR  C  F  RO
@@ -54,9 +157,9 @@ START  END    DUR  C  F  RO
 12:58  13:03  5 m  0  -  46
 #+END_SRC
 
-*** Only suggestions
+**** Only suggestions
 #+BEGIN_SRC sh
-$ ./go-atb --suggestions stud
+$ go-atb --suggestions stud
 Studentersamfundet (Trondheim)
 Studentersamfundet 2 (Trondheim)
 Berg studentby (Trondheim)

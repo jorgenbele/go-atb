@@ -41,7 +41,7 @@ func printRow(row []string, cw []int, spacing int, bold bool) {
 	for i, c := range row[:len(row)-1] {
 		fmt.Printf("%-*s%*c", cw[i], c[:min(cw[i], len(c))], spacing, ' ')
 	}
-	li := len(row)-1
+	li := len(row) - 1
 	lc := row[li]
 	fmt.Printf("%-*s\n", cw[li], lc[:min(cw[li], len(lc))])
 
@@ -67,16 +67,25 @@ func printPlanMinimal(deps []atb.Departure) {
 	}
 }
 
-func printRealtimeList(rdeps []atb.RealtimeDeparture, allowBold bool) {
+const (
+	// NoRoute is used when no route is provided as args.
+	NoRoute = 0
+)
+
+func printRealtimeList(rdeps []atb.RealtimeDeparture, allowBold bool, route int) {
 	header := []string{"ROUTE", "TIME", "TOWARDS", "REALTIME"}
 	spacing := 2
 
-	rows := make([][]string, len(rdeps))
+	rows := make([][]string, 0, len(rdeps))
 	cw := make([]int, len(header))
 	bold := make([]bool, len(rdeps))
 
 	for i, d := range rdeps {
 		var rtStr string
+
+		if route != NoRoute && d.Transport.Type == atb.TransportBus && d.Transport.LineNum != route {
+			continue
+		}
 
 		if d.IsRealtime {
 			rtStr = "TRUE"
@@ -85,16 +94,18 @@ func printRealtimeList(rdeps []atb.RealtimeDeparture, allowBold bool) {
 			rtStr = "FALSE"
 		}
 
-		rows[i] = []string{
+		row := []string{
 			fmt.Sprintf("%5d", d.Transport.LineNum),
 			fmt.Sprintf("%02d:%02d", d.Transport.Start.Hour(), d.Transport.Start.Minute()),
-			fmt.Sprintf("%s", d.Towards),
-			fmt.Sprintf("%s", rtStr),
+			d.Towards,
+			rtStr,
 		}
 
-		for j, c := range rows[i] {
+		for j, c := range row {
 			cw[j] = max(cw[j], len(c))
 		}
+
+		rows = append(rows, row)
 	}
 
 	printRow(header, cw, spacing, false)
@@ -220,7 +231,19 @@ func getSuggestions(from, to string) (selFrom, selTo string) {
 func main() {
 	usage := `AtB Travel Planner
 
-Usage: atb [--terse] ((--realtime <from> | <from> <to>) [--no-suggestions] | --suggestions <query>)
+Usage: atb [--terse] ((--realtime <from> [<route>] | <from> <to>) [--no-suggestions] | --suggestions <query>)
+
+Options:
+	   --terse                        Disables bold lines and use of symbols
+
+	   --realtime <from> [<route>]    Shows the realtime list of the busstation <from>, optionally
+									  only displaying results concerning route <route>.
+
+	   --no-suggestions               Disables the use of the suggestions feature which does a lookup
+									  of stations with name <from> (and <to> if not --realtime). This
+									  is useful when you have the complete unique name of a station.
+
+	   --suggestions <query>          Does a station lookup using the string <query> and exits.
 `
 	var opts docopt.Opts
 	var err error
@@ -233,6 +256,7 @@ Usage: atb [--terse] ((--realtime <from> | <from> <to>) [--no-suggestions] | --s
 		OnlySuggestions bool   `docopt:"--suggestions"`
 		Terse           bool   `docopt:"--terse"`
 		Realtime        bool   `docopt:"--realtime"`
+		Route           int    `docopt:"<route>"`
 	}
 
 	if opts, err = docopt.ParseDoc(usage); err != nil {
@@ -295,7 +319,7 @@ Usage: atb [--terse] ((--realtime <from> | <from> <to>) [--no-suggestions] | --s
 			panic(err)
 		}
 
-		printRealtimeList(rdeps, !config.Terse)
+		printRealtimeList(rdeps, !config.Terse, config.Route)
 		return
 	}
 
