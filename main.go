@@ -80,7 +80,7 @@ func printRealtimeList(rdeps []atb.RealtimeDeparture, allowBold bool, route int)
 	cw := make([]int, len(header))
 	bold := make([]bool, len(rdeps))
 
-	for i, d := range rdeps {
+	for _, d := range rdeps {
 		var rtStr string
 
 		if route != NoRoute && d.Transport.Type == atb.TransportBus && d.Transport.LineNum != route {
@@ -89,7 +89,7 @@ func printRealtimeList(rdeps []atb.RealtimeDeparture, allowBold bool, route int)
 
 		if d.IsRealtime {
 			rtStr = "TRUE"
-			bold[i] = true
+			bold[len(rows)] = true
 		} else {
 			rtStr = "FALSE"
 		}
@@ -234,16 +234,16 @@ func main() {
 Usage: atb [--terse] ((--realtime <from> [<route>] | <from> <to>) [--no-suggestions] | --suggestions <query>)
 
 Options:
-	   --terse                        Disables bold lines and use of symbols
+       --terse                        Disables bold lines and use of symbols
 
-	   --realtime <from> [<route>]    Shows the realtime list of the busstation <from>, optionally
-									  only displaying results concerning route <route>.
+       --realtime <from> [<route>]    Shows the realtime list of the busstation <from>, optionally
+                                      only displaying results concerning route <route>.
 
-	   --no-suggestions               Disables the use of the suggestions feature which does a lookup
-									  of stations with name <from> (and <to> if not --realtime). This
-									  is useful when you have the complete unique name of a station.
+       --no-suggestions               Disables the use of the suggestions feature which does a lookup
+                                      of stations with name <from> (and <to> if not --realtime). This
+                                      is useful when you have the complete unique name of a station.
 
-	   --suggestions <query>          Does a station lookup using the string <query> and exits.
+       --suggestions <query>          Does a station lookup using the string <query> and exits.
 `
 	var opts docopt.Opts
 	var err error
@@ -299,19 +299,31 @@ Options:
 			from = config.FromArg
 		} else {
 			suggestions, err := atb.GetSuggestions(config.FromArg)
-
-			finder, err := finder.New()
 			if err != nil {
 				panic(err)
 			}
 
-			finder.Read(source.Slice(suggestions))
-			selected, err := finder.Run()
-			if err != nil {
-				panic(err)
+			switch (len(suggestions)) {
+			case 0:
+				break
+
+			case 1:
+				from = suggestions[0]
+
+			default:
+				finder, err := finder.New()
+				if err != nil {
+					panic(err)
+				}
+
+				finder.Read(source.Slice(suggestions))
+				selected, err := finder.Run()
+				if err != nil {
+					panic(err)
+				}
+				// Take the first one, assume the user selected only one.
+				from = selected[0]
 			}
-			// Take the first one, assume the user selected only one.
-			from = selected[0]
 		}
 
 		rdeps, err := atb.GetRealtimeDepartures(1, from)
@@ -319,6 +331,9 @@ Options:
 			panic(err)
 		}
 
+		if !config.Terse {
+			fmt.Printf(bold(":: Realtime list from %s\n"), from)
+		}
 		printRealtimeList(rdeps, !config.Terse, config.Route)
 		return
 	}
