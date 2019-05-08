@@ -50,19 +50,19 @@ const (
 )
 
 type Transport struct {
-	Type     TransportType
-	WalkText string
-	LineNum  int
-	Start    time.Time
+	Type     TransportType `json:"type"`
+	WalkText string        `json:"walk_text,omitempty"`
+	LineNum  int           `json:"linenum"`
+	Start    time.Time     `json:"start_time"`
 }
 
 type Departure struct {
-	Start    time.Time
-	End      time.Time
-	Changes  int
-	Fare     string
-	Duration time.Duration
-	Route    []Transport
+	Start    time.Time     `json:"start"`
+	End      time.Time     `json:"end"`
+	Changes  int           `json:"changes"`
+	Fare     string        `json:"fare"`
+	Duration time.Duration `json:"duration"`
+	Route    []Transport   `json:"route"`
 }
 
 // getDeparturesResp is used to get departures for both realtime departures
@@ -326,10 +326,10 @@ func GetDeparturesNow(dir int, from, to string) ([]Departure, error) {
 }
 
 type RealtimeDeparture struct {
-	Transport  Transport
-	IsRealtime bool
-	LocationID int
-	Towards    string
+	Transport  Transport `json:"transport"`
+	IsRealtime bool      `json:"is_realtime"`
+	LocationID int       `json:"location_id"`
+	Towards    string    `json:"towards"`
 }
 
 func GetRealtimeDepartures(dir int, from string) (rdeps []RealtimeDeparture, err error) {

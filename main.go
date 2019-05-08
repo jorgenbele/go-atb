@@ -6,11 +6,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/b4b4r07/go-finder"
 	"github.com/b4b4r07/go-finder/source"
 	"github.com/docopt/docopt-go"
 	"github.com/jorgenbele/go-atb/atb"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -194,9 +196,10 @@ func getSuggestions(from, to string) (selFrom, selTo string) {
 	sFrom := <-fromChan
 	sTo := <-toChan
 
-	// Lazy init the finder only when needed.
-	var finder_ finder.Finder
-	finder_ = nil
+	// Lazy init the finder only when needed in case no finder
+	// is installed and the init fails.
+	var lazyfinder finder.Finder
+	lazyfinder = nil
 
 	userSelect := func(orig string, suggestions []string) string {
 		switch len(suggestions) {
@@ -205,16 +208,16 @@ func getSuggestions(from, to string) (selFrom, selTo string) {
 		case 1:
 			return suggestions[0]
 		default:
-			if finder_ == nil {
+			if lazyfinder == nil {
 				var err error
-				finder_, err = finder.New()
+				lazyfinder, err = finder.New()
 				if err != nil {
 					panic(err)
 				}
 			}
 
-			finder_.Read(source.Slice(suggestions))
-			selected, err := finder_.Run()
+			lazyfinder.Read(source.Slice(suggestions))
+			selected, err := lazyfinder.Run()
 			if err != nil {
 				panic(err)
 			}
@@ -228,10 +231,18 @@ func getSuggestions(from, to string) (selFrom, selTo string) {
 	return
 }
 
+func dumpJSON(v interface{}) {
+	json, err := json.Marshal(v)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to convert to json: %v", err))
+	}
+	os.Stdout.Write(json)
+}
+
 func main() {
 	usage := `AtB Travel Planner
 
-Usage: atb [--terse] ((--realtime <from> [<route>] | <from> <to>) [--no-suggestions] | --suggestions <query>)
+Usage: atb [--terse | --json] ((--realtime <from> [<route>] | [--minimal] <from> <to>) [--no-suggestions] | --suggestions <query>)
 
 Options:
        --terse                        Disables bold lines and use of symbols
@@ -244,6 +255,10 @@ Options:
                                       is useful when you have the complete unique name of a station.
 
        --suggestions <query>          Does a station lookup using the string <query> and exits.
+
+       --json                         Dump output in JSON format instead of in tabulated form.
+
+       --minimal                      Use an alternative tabulated output format. CONFLICTS with --json.
 `
 	var opts docopt.Opts
 	var err error
@@ -257,6 +272,8 @@ Options:
 		Terse           bool   `docopt:"--terse"`
 		Realtime        bool   `docopt:"--realtime"`
 		Route           int    `docopt:"<route>"`
+		Minimal         bool   `docopt:"--minimal"`
+		DumpJSON        bool   `docopt:"--json"`
 	}
 
 	if opts, err = docopt.ParseDoc(usage); err != nil {
@@ -289,6 +306,12 @@ Options:
 		if err != nil {
 			panic(fmt.Sprintf("Unable to get suggestion: %v", err))
 		}
+
+		if config.DumpJSON {
+			dumpJSON(v)
+			return
+		}
+
 		for _, e := range v {
 			fmt.Printf("%v\n", e)
 		}
@@ -303,7 +326,7 @@ Options:
 				panic(err)
 			}
 
-			switch (len(suggestions)) {
+			switch len(suggestions) {
 			case 0:
 				break
 
@@ -331,6 +354,11 @@ Options:
 			panic(err)
 		}
 
+		if config.DumpJSON {
+			dumpJSON(rdeps)
+			return
+		}
+
 		if !config.Terse {
 			fmt.Printf(bold(":: Realtime list from %s\n"), from)
 		}
@@ -354,10 +382,18 @@ Options:
 		//os.Exit(1)
 	}
 
-	//printPlanMinimal(deps)
+	if config.DumpJSON {
+		dumpJSON(deps)
+		return
+	}
+
 	if !config.Terse {
 		fmt.Printf(bold(":: From %s to %s\n"), from, to)
 	}
 
+	if config.Minimal {
+		printPlanMinimal(deps)
+		return
+	}
 	printPlanTabular(deps, symbs)
 }
