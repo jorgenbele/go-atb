@@ -19,11 +19,13 @@ import (
 // URL for the 'suggestions' endpoint.
 const SuggestionsURL = "https://rp.atb.no/scripts/TravelMagic/TravelMagicWE.dll/StageJSON"
 
+// SuggestionRes represents the result from the Suggestions endpoint (given by SuggestionsURL).
 type SuggestionRes struct {
 	Query       string   `json:"query"`
 	Suggestions []string `json:"suggestions"`
 }
 
+// GetSuggestions queries the SuggestionsURL to get bus-stops matching the given query.
 func GetSuggestions(query string) ([]string, error) {
 	ro := &grequests.RequestOptions{
 		Params: map[string]string{"query": query},
@@ -42,13 +44,17 @@ func GetSuggestions(query string) ([]string, error) {
 // URL for the 'departures' endpoint.
 const DeparturesURL = `https://rp.atb.no/scripts/TravelMagic/TravelMagicWE.dll/svar`
 
+// TransportType ...
 type TransportType int
 
 const (
+	// TransportBus ...
 	TransportBus TransportType = iota
+	// TransportWalking ...
 	TransportWalking
 )
 
+// Transport ...
 type Transport struct {
 	Type     TransportType `json:"type"`
 	WalkText string        `json:"walk_text,omitempty"`
@@ -56,6 +62,7 @@ type Transport struct {
 	Start    time.Time     `json:"start_time"`
 }
 
+// Departure ...
 type Departure struct {
 	Start    time.Time     `json:"start"`
 	End      time.Time     `json:"end"`
@@ -66,24 +73,31 @@ type Departure struct {
 }
 
 // getDeparturesResp is used to get departures for both realtime departures
-// and planned departures. It seems like the endpoint checks "adv" and "dep1"
+// and planned departures. It supports getting departures by departure time
+// and arrival time (not for realtime).
+//
+// It seems like the endpoint checks "adv" and "dep1"
 // do determine whether to return a realtime departure list or the planned
 // route departures.
-func getDeparturesResp(dir int, from, to, dtime, ddate string, realtime bool) (resp string, err error) {
+func getDeparturesResp(req DepartureReq) (resp string, err error) {
 	var advStr, dep1 string
-	if realtime {
+	direction := "1"
+
+	if req.IsRealtime {
 		advStr = "1" // XXX - Is this necessary?
 		dep1 = "1"
+	} else if req.IsArrivalTime {
+		direction = "2"
 	}
 
 	ro := &grequests.RequestOptions{
 		UserAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36",
 		Params: map[string]string{
-			"direction": "1", //string(dir),
-			"from":      from,
-			"to":        to,
-			"time":      dtime,
-			"date":      ddate,
+			"direction": direction,
+			"from":      req.From,
+			"to":        req.To,
+			"time":      req.Time,
+			"date":      req.Date,
 			"search":    "Show travel suggestions",
 			"lang":      "en",
 			"adv":       advStr,
@@ -113,7 +127,35 @@ func dateTimeMerge(datestr, timestr string) (time.Time, error) {
 	return t, err
 }
 
-func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, err error) {
+const (
+	// TimeDeparture is the 'dir' used when the dtime and ddate represents
+	// the departure time.
+	TimeDeparture int = 1
+
+	// TimeArrival is the 'dir' used when the dtime and ddate represents
+	// the arrival time.
+	TimeArrival       = 2
+)
+
+// DepartureReq holds information used in the
+// departure request.
+type DepartureReq struct {
+	//	Dir           int
+	From          string
+	To            string
+	Time          string
+	Date          string
+	IsArrivalTime bool // Used for non-realtime requests.
+	IsRealtime    bool
+}
+
+// GetDepartures ...
+func GetDepartures(dir int, from, to, dtime, ddate string) ([]Departure, error) {
+	return GetDeparturesReq(DepartureReq{from, to, dtime, ddate, dir == TimeArrival, false})
+}
+
+// GetDeparturesReq ...
+func GetDeparturesReq(req DepartureReq) (deps []Departure, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			// Error occoured, error that caused is stored in 'err'
@@ -176,7 +218,8 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 		return
 	}
 
-	html, err := getDeparturesResp(dir, from, to, dtime, ddate, false)
+	//html, err := getDeparturesResp(dir, from, to, dtime, ddate, false)
+	html, err := getDeparturesResp(req)
 	if err != nil {
 		return
 	}
@@ -312,19 +355,21 @@ func GetDepartures(dir int, from, to, dtime, ddate string) (deps []Departure, er
 		}
 		deps = append(deps, d)
 	}
-
 	return deps, nil
 }
 
-func GetDeparturesNow(dir int, from, to string) ([]Departure, error) {
+// GetDeparturesNow ...
+func GetDeparturesNow(from, to string) ([]Departure, error) {
 	now := time.Now()
 
 	dtime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
 	ddate := fmt.Sprintf("%02d.%02d.%02d", now.Day(), now.Month(), now.Year())
 
-	return GetDepartures(dir, from, to, dtime, ddate)
+	return GetDeparturesReq(DepartureReq{from, to, dtime, ddate, false, false})
 }
 
+// RealtimeDeparture contains the data describing
+// a realtime departure response.
 type RealtimeDeparture struct {
 	Transport  Transport `json:"transport"`
 	IsRealtime bool      `json:"is_realtime"`
@@ -332,7 +377,8 @@ type RealtimeDeparture struct {
 	Towards    string    `json:"towards"`
 }
 
-func GetRealtimeDepartures(dir int, from string) (rdeps []RealtimeDeparture, err error) {
+// GetRealtimeDepartures ...
+func GetRealtimeDepartures(from string) (rdeps []RealtimeDeparture, err error) {
 	// Same error-handling as in GetDepartures.
 	defer func() {
 		if r := recover(); r != nil {
@@ -400,11 +446,10 @@ func GetRealtimeDepartures(dir int, from string) (rdeps []RealtimeDeparture, err
 	dtime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
 	ddate := fmt.Sprintf("%02d.%02d.%02d", now.Day(), now.Month(), now.Year())
 
-	html, err := getDeparturesResp(dir, from, "", dtime, ddate, true)
+	html, err := getDeparturesResp(DepartureReq{from, "", dtime, ddate, false, true})
 	if err != nil {
 		return []RealtimeDeparture{}, nil
 	}
-	//fmt.Println(html)
 
 	doc := soup.HTMLParse(html)
 	if err = doc.Error; err != nil {
@@ -436,7 +481,6 @@ func GetRealtimeDepartures(dir int, from string) (rdeps []RealtimeDeparture, err
 		if err != nil {
 			return
 		}
-		//fmt.Printf("locationID: %d\n", locationID)
 
 		// TODO: Support other transport types than bus.
 		departuresLi := findAll(dg, "li", "class", "tm-departurelist-item")
@@ -483,9 +527,6 @@ func GetRealtimeDepartures(dir int, from string) (rdeps []RealtimeDeparture, err
 			if err != nil {
 				return
 			}
-
-			//fmt.Printf("transport: %v\n", rd.Transport)
-			//fmt.Printf("realtimedeparture: %v\n", rd)
 			rdeps = append(rdeps, rd)
 		}
 	}

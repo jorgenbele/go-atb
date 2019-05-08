@@ -15,6 +15,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func bold(s string) string {
@@ -242,10 +243,10 @@ func dumpJSON(v interface{}) {
 func main() {
 	usage := `AtB Travel Planner
 
-Usage: atb [--terse | --json] ((--realtime <from> [<route>] | [--minimal] <from> <to>) [--no-suggestions] | --suggestions <query>)
+Usage: atb [--terse | --json] (--realtime <from> [<route>] | [--minimal] <from> <to> [(--departure | --arrival) <time> [<date>]] [--no-suggestions] | --suggestions <query>)
 
 Options:
-       --terse                        Disables bold lines and use of symbols
+       --terse                        Disables bold lines and use of symbols.
 
        --realtime <from> [<route>]    Shows the realtime list of the busstation <from>, optionally
                                       only displaying results concerning route <route>.
@@ -259,21 +260,32 @@ Options:
        --json                         Dump output in JSON format instead of in tabulated form.
 
        --minimal                      Use an alternative tabulated output format. CONFLICTS with --json.
+
+       --departure <time> [<date>]    Depart at time <time> on date <date> (today if not specified).
+       --arrival   <time> [<date>]    Arrive by time <time> on date <date> (today if not specified).
+
+Formatting:
+       <time> has to be on the format: HOUR:MINUTE
+       <date> has to be on the format: DAYOFMONTH.MONTH.YEAR
 `
 	var opts docopt.Opts
 	var err error
 
 	var config struct {
-		ToArg           string `docopt:"<to>"`
-		FromArg         string `docopt:"<from>"`
-		NoSuggestions   bool   `docopt:"--no-suggestions"`
-		Query           string `docopt:"<query>"`
-		OnlySuggestions bool   `docopt:"--suggestions"`
-		Terse           bool   `docopt:"--terse"`
-		Realtime        bool   `docopt:"--realtime"`
-		Route           int    `docopt:"<route>"`
-		Minimal         bool   `docopt:"--minimal"`
-		DumpJSON        bool   `docopt:"--json"`
+		ToArg            string `docopt:"<to>"`
+		FromArg          string `docopt:"<from>"`
+		NoSuggestions    bool   `docopt:"--no-suggestions"`
+		Query            string `docopt:"<query>"`
+		OnlySuggestions  bool   `docopt:"--suggestions"`
+		Terse            bool   `docopt:"--terse"`
+		Realtime         bool   `docopt:"--realtime"`
+		Route            int    `docopt:"<route>"`
+		Minimal          bool   `docopt:"--minimal"`
+		DumpJSON         bool   `docopt:"--json"`
+		UseArrivalTime   bool   `docopt:"--arrival"`
+		UseDepartureTime bool   `docopt:"--departure"`
+		Date             string `docopt:"<date>"`
+		Time             string `docopt:"<time>"`
 	}
 
 	if opts, err = docopt.ParseDoc(usage); err != nil {
@@ -349,7 +361,7 @@ Options:
 			}
 		}
 
-		rdeps, err := atb.GetRealtimeDepartures(1, from)
+		rdeps, err := atb.GetRealtimeDepartures(from)
 		if err != nil {
 			panic(err)
 		}
@@ -374,7 +386,18 @@ Options:
 		from, to = getSuggestions(config.FromArg, config.ToArg)
 	}
 
-	deps, err := atb.GetDeparturesNow(1, from, to)
+	var deps []atb.Departure
+	if config.UseArrivalTime || config.UseDepartureTime {
+		date := config.Date
+		if date == "" {
+			now := time.Now()
+			date = fmt.Sprintf("%02d.%02d.%02d", now.Day(), now.Month(), now.Year())
+		}
+		deps, err = atb.GetDeparturesReq(atb.DepartureReq{from, to, config.Time, date, config.UseArrivalTime, false})
+	} else {
+		deps, err = atb.GetDeparturesNow(from, to)
+	}
+
 	if err != nil {
 		// Panic to get more debugging output.
 		panic(fmt.Sprintf("Unable to get departures: %v\n", err))
