@@ -1,18 +1,17 @@
 * go-atb
 ~go-atb~ is a cli for AtB's travel planner. (see: atb.no)
-It is separated into a go package (~atb~) which can be reused for
-other purposes and a cli program (~main.go~).
+This repo includes the ~atb~ package and a cli program which ~main.go~.
 
 ** How to install
 #+BEGIN_SRC sh
 go get github.com/jorgenbele/go-atb
 #+END_SRC
 
-** Usage
+** Usage (CLI)
 #+BEGIN_SRC sh
 AtB Travel Planner
 
-Usage: atb [--terse] ((--realtime <from> [<route>] | <from> <to>) [--no-suggestions] | --suggestions <query>)
+Usage: atb [--terse | --json] ((--realtime <from> [<route>] | [--minimal] <from> <to>) [--no-suggestions] | --suggestions <query>)
 
 Options:
        --terse                        Disables bold lines and use of symbols
@@ -25,6 +24,10 @@ Options:
                                       is useful when you have the complete unique name of a station.
 
        --suggestions <query>          Does a station lookup using the string <query> and exits.
+
+       --json                         Dump output in JSON format instead of in tabulated form.
+
+       --minimal                      Use an alternative tabulated output format. CONFLICTS with --json.
 #+END_SRC
 
 ** Gif (outdated)
