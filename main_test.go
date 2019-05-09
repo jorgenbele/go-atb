@@ -12,12 +12,12 @@ var deps []atb.Departure
 
 func TestMain(m *testing.M) {
 	var err error
-	realtimeDeps, err = atb.GetRealtimeDepartures(1, "Solsiden (Trondheim)")
+	realtimeDeps, err = atb.GetRealtimeDepartures("Solsiden (Trondheim)")
 	if err != nil {
 		fmt.Printf("Unable to get realtime departures: %v\n", err)
 		os.Exit(1)
 	}
-	deps, err = atb.GetDeparturesNow(1, "Solsiden (Trondheim)", "Munkegata (Trondheim)")
+	deps, err = atb.GetDeparturesNow("Solsiden (Trondheim)", "Munkegata (Trondheim)")
 	if err != nil {
 		fmt.Printf("Unable to get departures: %v\n", err)
 		os.Exit(1)
