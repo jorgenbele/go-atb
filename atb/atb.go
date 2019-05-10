@@ -16,6 +16,12 @@ import (
 	"time"
 )
 
+var location *time.Location
+
+func init() {
+	location, _ = time.LoadLocation("Europe/Oslo")
+}
+
 // URL for the 'suggestions' endpoint.
 const SuggestionsURL = "https://rp.atb.no/scripts/TravelMagic/TravelMagicWE.dll/StageJSON"
 
@@ -122,8 +128,10 @@ func getDeparturesResp(req DepartureReq) (resp string, err error) {
 func dateTimeMerge(datestr, timestr string) (time.Time, error) {
 	// Use the date of departure together with the start/end time
 	// to convert to a time.Time object.
+
 	timeLayout := "Monday 2 January 2006 15:04"
-	t, err := time.Parse(timeLayout, datestr+timestr)
+	//t, err := time.Parse(timeLayout, datestr+timestr)
+	t, err := time.ParseInLocation(timeLayout, datestr+timestr, location)
 	return t, err
 }
 
