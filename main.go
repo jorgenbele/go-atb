@@ -243,7 +243,7 @@ func dumpJSON(v interface{}) {
 func main() {
 	usage := `AtB Travel Planner
 
-Usage: atb [--terse | --json] (--realtime <from> [<route>] | [--minimal] <from> <to> [(--departure | --arrival) <time> [<date>]] [--no-suggestions] | --suggestions <query>)
+Usage: atb [--terse | --json] ((--realtime <from> [<route>] | [--minimal] <from> <to> [(--departure | --arrival) <time> [<date>]]) [--no-suggestions] | --suggestions <query>)
 
 Options:
        --terse                        Disables bold lines and use of symbols.
