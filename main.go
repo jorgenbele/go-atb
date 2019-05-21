@@ -393,7 +393,7 @@ Formatting:
 			now := time.Now()
 			date = fmt.Sprintf("%02d.%02d.%02d", now.Day(), now.Month(), now.Year())
 		}
-		deps, err = atb.GetDeparturesReq(atb.DepartureReq{from, to, config.Time, date, config.UseArrivalTime, false})
+		deps, err = atb.GetDeparturesReq(atb.DepartureReq{From: from, To: to, Time: config.Time, Date: date, IsArrivalTime: config.UseArrivalTime, IsRealtime: false})
 	} else {
 		deps, err = atb.GetDeparturesNow(from, to)
 	}

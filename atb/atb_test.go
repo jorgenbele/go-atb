@@ -22,7 +22,7 @@ func suggestionsEqual(t *testing.T, query string, expected map[string]bool) {
 		}
 	}
 
-	for k, _ := range expected {
+	for k := range expected {
 		if _, ok := m[k]; !ok {
 			t.Errorf("query: %s, expected key %s", query, k)
 		}

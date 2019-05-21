@@ -22,7 +22,7 @@ func init() {
 	location, _ = time.LoadLocation("Europe/Oslo")
 }
 
-// URL for the 'suggestions' endpoint.
+// SuggestionsURL is the URL for the 'suggestions' endpoint.
 const SuggestionsURL = "https://rp.atb.no/scripts/TravelMagic/TravelMagicWE.dll/StageJSON"
 
 // SuggestionRes represents the result from the Suggestions endpoint (given by SuggestionsURL).
@@ -47,7 +47,7 @@ func GetSuggestions(query string) ([]string, error) {
 	return sr.Suggestions, err
 }
 
-// URL for the 'departures' endpoint.
+// DeparturesURL is the URL for the 'departures' endpoint.
 const DeparturesURL = `https://rp.atb.no/scripts/TravelMagic/TravelMagicWE.dll/svar`
 
 // TransportType ...
@@ -142,7 +142,7 @@ const (
 
 	// TimeArrival is the 'dir' used when the dtime and ddate represents
 	// the arrival time.
-	TimeArrival       = 2
+	TimeArrival = 2
 )
 
 // DepartureReq holds information used in the
@@ -177,7 +177,6 @@ func GetDeparturesReq(req DepartureReq) (deps []Departure, err error) {
 		// seen above.
 		if err != nil {
 			panic(err)
-			return
 		}
 		res = root.Find(args...)
 		err = res.Error
@@ -187,7 +186,6 @@ func GetDeparturesReq(req DepartureReq) (deps []Departure, err error) {
 	findStrict := func(root soup.Root, args ...string) (res soup.Root) {
 		if err != nil {
 			panic(err)
-			return
 		}
 		res = root.FindStrict(args...)
 		err = res.Error
@@ -197,14 +195,12 @@ func GetDeparturesReq(req DepartureReq) (deps []Departure, err error) {
 	findAll := func(root soup.Root, args ...string) (res []soup.Root) {
 		if err != nil {
 			panic(err)
-			return
 		}
 		res = root.FindAll(args...)
 		for _, r := range res {
 			if r.Error != nil {
 				err = r.Error
 				panic(err)
-				break
 			}
 		}
 		return
@@ -213,14 +209,12 @@ func GetDeparturesReq(req DepartureReq) (deps []Departure, err error) {
 	findAllStrict := func(root soup.Root, args ...string) (res []soup.Root) {
 		if err != nil {
 			panic(err)
-			return
 		}
 		res = root.FindAllStrict(args...)
 		for _, r := range res {
 			if r.Error != nil {
 				err = r.Error
 				panic(err)
-				break
 			}
 		}
 		return
@@ -401,7 +395,6 @@ func GetRealtimeDepartures(from string) (rdeps []RealtimeDeparture, err error) {
 		// seen above.
 		if err != nil {
 			panic(err)
-			return
 		}
 		res = root.Find(args...)
 		err = res.Error
@@ -411,7 +404,6 @@ func GetRealtimeDepartures(from string) (rdeps []RealtimeDeparture, err error) {
 	findStrict := func(root soup.Root, args ...string) (res soup.Root) {
 		if err != nil {
 			panic(err)
-			return
 		}
 		res = root.FindStrict(args...)
 		err = res.Error
@@ -421,14 +413,12 @@ func GetRealtimeDepartures(from string) (rdeps []RealtimeDeparture, err error) {
 	findAll := func(root soup.Root, args ...string) (res []soup.Root) {
 		if err != nil {
 			panic(err)
-			return
 		}
 		res = root.FindAll(args...)
 		for _, r := range res {
 			if r.Error != nil {
 				err = r.Error
 				panic(err)
-				break
 			}
 		}
 		return
@@ -437,14 +427,12 @@ func GetRealtimeDepartures(from string) (rdeps []RealtimeDeparture, err error) {
 	findAllStrict := func(root soup.Root, args ...string) (res []soup.Root) {
 		if err != nil {
 			panic(err)
-			return
 		}
 		res = root.FindAllStrict(args...)
 		for _, r := range res {
 			if r.Error != nil {
 				err = r.Error
 				panic(err)
-				break
 			}
 		}
 		return
