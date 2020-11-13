@@ -243,7 +243,7 @@ func dumpJSON(v interface{}) {
 func main() {
 	usage := `AtB Travel Planner
 
-Usage: atb [--terse | --json] (([--minimal] <from> <to> [(--departure | --arrival) <time> [<date>]]) [--no-suggestions] | --suggestions <query>)
+Usage: atb [--terse | --json] (([--minimal] <from> <to> [(--departure | --arrival) <time> [<date>]]) [--no-suggestions] | --suggestions <query> | --serve-api <apikey>)
 
 Options:
        --terse                        Disables bold lines and use of symbols.
@@ -282,6 +282,8 @@ Formatting:
 		UseDepartureTime bool   `docopt:"--departure"`
 		Date             string `docopt:"<date>"`
 		Time             string `docopt:"<time>"`
+		ServeAPI         bool   `docopt:"--serve-api"`
+		ServeAPIKey      string `docopt:"<apikey>"`
 	}
 
 	if opts, err = docopt.ParseDoc(usage); err != nil {
@@ -289,6 +291,12 @@ Formatting:
 	}
 
 	opts.Bind(&config)
+
+	if config.ServeAPI {
+		r := atb.CreateAPIEngine(config.ServeAPIKey)
+		r.Run()
+		return
+	}
 
 	var symbs symbols
 	if config.Terse {
