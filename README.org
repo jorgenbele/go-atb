@@ -4,7 +4,7 @@ This repo includes the ~atb~ package and a cli program which ~main.go~.
 
 ** How to install
 #+BEGIN_SRC sh
-go get github.com/jorgenbele/go-atb
+go install github.com/jorgenbele/go-atb/v2@latest
 #+END_SRC
 
 ** Usage (CLI)
