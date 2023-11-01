@@ -243,10 +243,13 @@ func dumpJSON(v interface{}) {
 func main() {
 	usage := `AtB Travel Planner
 
-Usage: atb [--terse | --json] (([--minimal] <from> <to> [(--departure | --arrival) <time> [<date>]]) [--no-suggestions] | --suggestions <query>)
+Usage: atb [--terse | --json] ((--realtime <from> [<route>] | [--minimal] <from> <to> [(--departure | --arrival) <time> [<date>]]) [--no-suggestions] | --suggestions <query>)
 
 Options:
        --terse                        Disables bold lines and use of symbols.
+
+       --realtime <from> [<route>]    Shows the realtime list of the busstation <from>, optionally
+                                      only displaying results concerning route <route>.
 
        --no-suggestions               Disables the use of the suggestions feature which does a lookup
                                       of stations with name <from> (and <to> if not --realtime). This
@@ -275,6 +278,7 @@ Formatting:
 		Query            string `docopt:"<query>"`
 		OnlySuggestions  bool   `docopt:"--suggestions"`
 		Terse            bool   `docopt:"--terse"`
+		Realtime         bool   `docopt:"--realtime"`
 		Route            int    `docopt:"<route>"`
 		Minimal          bool   `docopt:"--minimal"`
 		DumpJSON         bool   `docopt:"--json"`
@@ -323,6 +327,54 @@ Formatting:
 		for _, e := range v {
 			fmt.Printf("%v\n", e)
 		}
+		return
+	} else if config.Realtime {
+		var from string
+		if config.NoSuggestions {
+			from = config.FromArg
+		} else {
+			suggestions, err := atb.GetSuggestions(config.FromArg)
+			if err != nil {
+				panic(err)
+			}
+
+			switch len(suggestions) {
+			case 0:
+				break
+
+			case 1:
+				from = suggestions[0]
+
+			default:
+				finder, err := finder.New()
+				if err != nil {
+					panic(err)
+				}
+
+				finder.Read(source.Slice(suggestions))
+				selected, err := finder.Run()
+				if err != nil {
+					panic(err)
+				}
+				// Take the first one, assume the user selected only one.
+				from = selected[0]
+			}
+		}
+
+		rdeps, err := atb.GetRealtimeDepartures(from)
+		if err != nil {
+			panic(err)
+		}
+
+		if config.DumpJSON {
+			dumpJSON(rdeps)
+			return
+		}
+
+		if !config.Terse {
+			fmt.Printf(bold(":: Realtime list from %s\n"), from)
+		}
+		printRealtimeList(rdeps, !config.Terse, config.Route)
 		return
 	}
 
