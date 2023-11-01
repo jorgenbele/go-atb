@@ -236,11 +236,7 @@ func GetDeparturesReq(req DepartureReq) (deps []Departure, err error) {
 	// Used when parsing start and end times.
 	date := findStrict(doc, "h2", "class", "tm-alpha tm-reiseforslag-header")
 	if err = date.Error; err != nil {
-		// When in realtime mode this will show up
-		date := findStrict(doc, "h2", "class", "tm-alpha tm-avgangs-header-dag")
-		if err = date.Error; err != nil {
-			return
-		}
+		return
 	}
 
 	dateStr := date.Text()
@@ -460,7 +456,8 @@ func GetRealtimeDepartures(from string) (rdeps []RealtimeDeparture, err error) {
 
 	// Used when parsing start and end times.
 	// date := findStrict(doc, "span", "class", "tm-avgangstider-dato")
-	date := findStrict(doc, "span", "class", "tm-reiseforslag-header")
+	// date := findStrict(doc, "span", "class", "tm-reiseforslag-header")
+	date := findStrict(doc, "h2", "class", "tm-alpha tm-avgangs-header-dag")
 	if err = date.Error; err != nil {
 		return
 	}
