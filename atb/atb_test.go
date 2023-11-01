@@ -31,12 +31,11 @@ func suggestionsEqual(t *testing.T, query string, expected map[string]bool) {
 
 func TestGetSuggestions(t *testing.T) {
 	suggestionsEqual(t, "munke", map[string]bool{
-		"Munkegata (Trondheim)":    true,
+		"Munken (Indre Fosen)":     true,
 		"Munkeby (Levanger)":       true,
 		"Munkebykorsen (Levanger)": true,
-		"Munken (Leksvik)":         true,
 		"Munkebyvegen (Levanger)":  true,
-		"Munken (Indre Fosen)":     true,
+		"Munkegata (Trondheim)":    true,
 		"Munken (Ørland)":          true,
 	})
 
@@ -49,9 +48,7 @@ func TestGetSuggestions(t *testing.T) {
 	})
 
 	suggestionsEqual(t, "samfundet", map[string]bool{
-		"Samfundet (Trondheim)":            true,
-		"Studentersamfundet (Trondheim)":   true,
-		"Studentersamfundet 2 (Trondheim)": true,
+		"Studentersamfundet (Trondheim)": true,
 	})
 }
 
