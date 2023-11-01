@@ -455,7 +455,8 @@ func GetRealtimeDepartures(from string) (rdeps []RealtimeDeparture, err error) {
 	mainContent := findStrict(doc, "div", "class", "maincontent")
 
 	// Used when parsing start and end times.
-	date := findStrict(doc, "span", "class", "tm-avgangstider-dato")
+	// date := findStrict(doc, "span", "class", "tm-avgangstider-dato")
+	date := findStrict(doc, "span", "class", "tm-reiseforslag-header")
 	if err = date.Error; err != nil {
 		return
 	}
